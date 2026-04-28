@@ -1,0 +1,3976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DADA Rate Recovery — Interactive</title>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+  onload="renderMathInElement(document.body, {delimiters: [
+    {left: '$$', right: '$$', display: true},
+    {left: '$',  right: '$',  display: false},
+    {left: '\\[', right: '\\]', display: true},
+    {left: '\\(', right: '\\)', display: false}
+  ], throwOnError: false});"></script>
+<style>
+:root {
+  --bg:       #fbf8f1;
+  --panel:    #f3ecdf;
+  --panel2:   #faf5ea;
+  --border:   #c9bfa8;
+  --border2:  #b5a98e;
+  --accent:   #7a4b2b;
+  --accent2:  #1f4e79;
+  --text:     #1a1a1a;
+  --muted:    #7a7a7a;
+  --muted2:   #555;
+  --good:     #2d6a3a;
+  --warn:     #8a6b1a;
+  --bad:      #a61d1d;
+  --def-bg:   #faf3dc;  --def-ru: #c6a64c;
+  --thm-bg:   #eaf0f7;  --thm-ru: #7f9cc1;
+  --note-bg:  #f5efe3;  --note-ru: #b9a47a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Iowan Old Style', 'Charter', 'Georgia', 'Cambria', serif;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 18px 26px;
+}
+h1 {
+  font-family: 'Iowan Old Style', 'Georgia', serif;
+  font-weight: 500; font-style: italic;
+  font-size: 22px; color: var(--accent);
+  margin-bottom: 4px;
+}
+.subtitle { color: var(--muted2); font-size: 12px; margin-bottom: 12px; max-width: 900px; }
+.panel, .panel2 {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.panel2 { background: var(--panel2); }
+.section-head {
+  font-family: 'Iowan Old Style', serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Top bar: DADA + seed + randomizer mode + randomize button ── */
+.top-bar {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+}
+.top-bar .field { display: flex; flex-direction: column; gap: 4px; }
+.top-bar label {
+  color: var(--muted2); font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 4px;
+}
+.top-bar input[type="text"],
+.top-bar input[type="number"],
+.top-bar select {
+  background: var(--panel2);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  padding: 6px 9px;
+  outline: none;
+}
+.top-bar input[type="text"] { width: 170px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+.top-bar input[type="number"] { width: 90px; }
+.top-bar input:focus, .top-bar select:focus { border-color: var(--accent); }
+.top-bar .status {
+  color: var(--muted); font-size: 11px; font-family: 'Fira Code', monospace;
+  margin-left: auto; align-self: center;
+}
+
+/* Toggle group for mode switch */
+.toggle-group {
+  display: inline-flex;
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.toggle-group button {
+  background: var(--panel2); color: var(--muted2);
+  border: none; padding: 6px 12px;
+  font-family: inherit; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer;
+}
+.toggle-group button:not(:last-child) { border-right: 1px solid var(--border2); }
+.toggle-group button.on { background: var(--accent2); color: #fff; }
+.toggle-group button:hover:not(.on) { color: var(--text); }
+
+/* Primary buttons */
+.btn {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: var(--panel2);
+  color: var(--muted2);
+  cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+}
+.btn:hover { color: var(--text); border-color: var(--muted); }
+.btn.accent { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.btn.accent:hover { background: var(--accent2); border-color: var(--accent2); color: #fff; }
+
+/* ── Unified slider block ── */
+.slider-block {
+  display: grid;
+  grid-template-columns: 175px 1fr 100px 22px;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.slider-block .slabel {
+  color: var(--accent); font-weight: 600; font-size: 12.5px;
+}
+.slider-block input[type="range"] {
+  width: 100%; accent-color: var(--accent);
+}
+.slider-block select {
+  background: var(--panel2); border: 1px solid var(--border2);
+  border-radius: 4px; color: var(--text);
+  font-family: 'Fira Code', monospace; font-size: 12px;
+  padding: 5px 8px; grid-column: 2 / 4;
+}
+.slider-block .sval {
+  font-family: 'Fira Code', monospace; font-size: 12px;
+  color: var(--accent2); font-weight: 700; text-align: right;
+}
+.slider-block.disabled { opacity: 0.35; pointer-events: none; }
+
+/* ── Help-icon (?) with inline tooltip ── */
+.help-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); font-family: 'Iowan Old Style', serif;
+  font-size: 11px; font-weight: 700;
+  cursor: help; position: relative;
+}
+.help-icon:hover { border-color: var(--accent); color: var(--accent); }
+.help-icon::after {
+  content: attr(data-help);
+  position: absolute;
+  top: 24px; right: -6px;
+  background: rgba(251, 248, 241, 0.98);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 10px 12px;
+  width: 280px;
+  font-family: 'Iowan Old Style', Georgia, serif;
+  font-size: 11.5px; font-weight: 400; line-height: 1.55;
+  color: var(--text); white-space: normal; text-align: left;
+  box-shadow: 0 4px 12px rgba(122,75,43,0.25);
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+  z-index: 600;
+}
+.help-icon:hover::after, .help-icon:focus::after { opacity: 1; }
+
+/* ── Collapsible (Additional Parameters) ── */
+details.collapse-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+details.collapse-panel > summary {
+  list-style: none; cursor: pointer;
+  padding: 10px 14px;
+  font-family: 'Iowan Old Style', serif;
+  font-weight: 600; font-size: 13px;
+  color: var(--accent2);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border-radius: 6px;
+}
+details.collapse-panel > summary::-webkit-details-marker { display: none; }
+details.collapse-panel > summary::before {
+  content: '▸'; display: inline-block;
+  margin-right: 8px; transition: transform 0.15s;
+}
+details.collapse-panel[open] > summary::before { transform: rotate(90deg); }
+details.collapse-panel .collapse-body { padding: 0 14px 12px; }
+
+/* ── Toggles row ── */
+.toggles { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+.toggles label { color: var(--muted2); font-size: 12px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.toggles input { cursor: pointer; }
+
+/* ── Main viz row: DAG + diagnostics side-table ── */
+.viz-row {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+.dag-container {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+svg.dag { display: block; background: var(--panel); width: 100%; }
+svg.dag path.edge-hit { cursor: pointer; stroke: transparent; stroke-width: 14; fill: none; }
+svg.dag path.edge-vis { fill: none; }
+svg.dag circle.node { cursor: pointer; transition: filter 0.1s; }
+svg.dag circle.node:hover { filter: brightness(1.3); }
+svg.dag .layer-ring { fill: none; pointer-events: none; stroke: var(--border); stroke-dasharray: 2 4; opacity: 0.55; }
+
+/* Diagnostics table on the right */
+.diag-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+table.diag-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.diag-table td {
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--border);
+}
+table.diag-table tr:last-child td { border-bottom: none; }
+table.diag-table td.lbl { color: var(--muted2); font-size: 11.5px; }
+table.diag-table td.val {
+  font-family: 'Fira Code', Consolas, monospace;
+  font-weight: 700;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text);
+}
+table.diag-table td.val.good { color: var(--good); }
+table.diag-table td.val.warn { color: var(--warn); }
+table.diag-table td.val.bad  { color: var(--bad); }
+.verdict {
+  padding: 8px 0;
+  font-family: 'Iowan Old Style', serif;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 12.5px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.verdict.good { background: rgba(45,106,58,0.10); color: var(--good); }
+.verdict.warn { background: rgba(138,107,26,0.10); color: var(--warn); }
+.verdict.bad  { background: rgba(166,29,29,0.08);  color: var(--bad); }
+
+/* ── Sashimi tooltip (hover) + pinned badges ── */
+#sashimi-tip {
+  position: fixed; display: none;
+  background: rgba(251, 248, 241, 0.98);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  z-index: 1001;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(122, 75, 43, 0.18);
+  font-size: 11px;
+  max-width: 320px;
+}
+#sashimi-tip .title {
+  font-family: 'Fira Code', monospace;
+  font-weight: 700; color: var(--accent);
+  margin-bottom: 4px;
+}
+#sashimi-tip .sub {
+  color: var(--muted2); font-size: 10.5px; margin-bottom: 6px;
+}
+#sashimi-tip canvas {
+  display: block; width: 260px; height: 60px;
+  background: var(--bg);
+  border: 1px solid var(--border); border-radius: 4px;
+}
+
+/* Pinned sashimi badges — HTML overlay anchored to the DAG container,
+   positioned in SVG coordinates by JS. Plain <div>+<canvas> avoids the
+   foreignObject layout quirks that were preventing pins from showing. */
+.pinned-layer {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.pinned-badge {
+  position: absolute;
+  background: rgba(251, 248, 241, 0.96);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 3px 5px 4px;
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+  color: var(--text);
+  box-shadow: 0 2px 6px rgba(122, 75, 43, 0.18);
+  transform: translate(-50%, 0);
+}
+.pinned-badge .lbl {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 9.5px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 130px;
+  text-overflow: ellipsis;
+}
+.pinned-badge canvas {
+  display: block; width: 130px; height: 30px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+/* Edge-rate edit popup */
+#edge-popup {
+  position: fixed; display: none;
+  background: var(--panel);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  padding: 10px;
+  z-index: 1002;
+  box-shadow: 0 4px 12px rgba(122,75,43,0.18);
+}
+#edge-popup .ep-title { color: var(--text); font-size: 11px; margin-bottom: 6px; }
+#edge-popup input[type="number"] {
+  background: var(--bg); border: 1px solid var(--border2);
+  color: var(--text); padding: 4px 8px;
+  border-radius: 4px; width: 90px;
+  font-family: inherit; font-size: 12px;
+}
+
+/* ── Rate recovery ── */
+.recovery-row {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+canvas.recovery-canvas {
+  display: block; width: 100%; height: 280px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.recovery-info { color: var(--muted2); font-size: 11px; margin-bottom: 6px; }
+table.rate-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 11px;
+}
+table.rate-table th, table.rate-table td {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  text-align: right;
+}
+table.rate-table th { background: var(--panel2); color: var(--text); font-weight: 600; }
+table.rate-table td.left { text-align: left; }
+table.rate-table td.good { color: var(--good); }
+table.rate-table td.warn { color: var(--warn); }
+table.rate-table td.bad  { color: var(--bad); }
+table.rate-table td.editable { cursor: pointer; text-decoration: underline dotted var(--muted); }
+table.rate-table td.editable:hover { color: var(--accent); }
+
+/* Profile preview canvas (inside Additional Params) */
+.profile-canvas {
+  display: block; width: 100%; height: 50px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+/* ── About modal ── */
+.header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.header-row h1 { margin-bottom: 0; }
+.about-btn {
+  background: transparent; color: var(--accent); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 4px 12px;
+  font-family: 'Fira Code', monospace; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer;
+}
+.about-btn:hover { background: rgba(122,75,43,0.08); }
+.about-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 24px; }
+.about-overlay.open { display: flex; }
+.about-modal { background: var(--panel); border: 1px solid var(--border2); border-radius: 8px; max-width: 900px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.35); }
+.about-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.about-header h2 { font-family: 'Iowan Old Style', serif; font-weight: 800; font-size: 16px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; }
+.about-close { background: transparent; border: 1px solid var(--border2); color: var(--text); border-radius: 4px; padding: 4px 10px; cursor: pointer; font-family: 'Fira Code', monospace; font-size: 11px; }
+.about-close:hover { border-color: var(--accent); color: var(--accent); }
+.about-body { overflow-y: auto; padding: 18px 24px 24px; line-height: 1.6; color: var(--text); }
+.about-body h3 { color: var(--accent); font-family: 'Iowan Old Style', serif; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 22px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.about-body h3:first-child { margin-top: 0; }
+.about-body h4 { font-family: 'Iowan Old Style', Georgia, serif; font-style: italic; font-weight: 600; font-size: 13.5px; color: var(--text); margin-top: 16px; margin-bottom: 4px; }
+.about-body p, .about-body ul, .about-body ol { color: var(--text); font-size: 13px; margin-bottom: 10px; line-height: 1.62; }
+.about-body ul, .about-body ol { padding-left: 22px; }
+.about-body li { margin-bottom: 3px; }
+.about-body b, .about-body strong { color: var(--text); font-weight: 700; }
+.about-body em, .about-body i { font-style: italic; }
+.about-body code { font-family: 'Fira Code', Consolas, monospace; background: var(--bg); padding: 1px 5px; border-radius: 3px; color: var(--text); font-size: 0.9em; }
+.about-body .box { border-left: 3px solid; padding: 10px 14px; margin: 12px 0; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.6; }
+.about-body .box .label { font-variant: small-caps; letter-spacing: 0.12em; font-weight: 700; margin-right: 8px; }
+.about-body .box.definition { background: var(--def-bg); border-color: var(--def-ru); }
+.about-body .box.definition .label { color: #8a6b1a; }
+.about-body .box.theorem    { background: var(--thm-bg); border-color: var(--thm-ru); }
+.about-body .box.theorem    .label { color: var(--accent2); }
+.about-body .box.note       { background: var(--note-bg); border-color: var(--note-ru); }
+.about-body .box.note       .label { color: #7a5a2c; }
+.about-body .katex { font-size: 1.02em; }
+.about-body .katex-display { margin: 10px 0 !important; }
+.about-body table.mathtable { border-collapse: collapse; margin: 10px 0; font-size: 11.5px; color: var(--muted2); }
+.about-body table.mathtable th, .about-body table.mathtable td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
+.about-body table.mathtable th { background: var(--panel2); color: var(--text); font-weight: 700; letter-spacing: 0.04em; }
+.about-body .toc { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; }
+.about-body .toc a { color: var(--accent); text-decoration: none; font-size: 11.5px; }
+.about-body .toc a:hover { text-decoration: underline; }
+.about-body .toc ol { margin: 4px 0 0 0; padding-left: 20px; }
+
+/* ============ ABOUT MODAL ============ */
+.header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.header-row h1 { margin-bottom: 0; }
+.about-btn {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.about-btn:hover { background: rgba(122, 75, 43, 0.08); }
+
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+.about-overlay.open { display: flex; }
+.about-modal {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.about-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.about-header h2 {
+  font-family: 'Iowan Old Style', 'Georgia', serif;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.about-close {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+}
+.about-close:hover { border-color: var(--accent); color: var(--accent); }
+.about-body {
+  overflow-y: auto;
+  padding: 18px 24px 24px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.about-body h3 {
+  color: var(--accent);
+  font-family: 'Iowan Old Style', 'Georgia', serif;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 22px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.about-body h3:first-child { margin-top: 0; }
+.about-body h4 {
+  font-family: 'Iowan Old Style', 'Georgia', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text);
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+.about-body p, .about-body ul, .about-body ol {
+  color: var(--text);
+  font-size: 13px;
+  margin-bottom: 10px;
+  line-height: 1.62;
+}
+.about-body ul, .about-body ol { padding-left: 22px; }
+.about-body li { margin-bottom: 3px; }
+.about-body b, .about-body strong { color: var(--text); font-weight: 700; }
+.about-body em, .about-body i { font-style: italic; }
+.about-body code {
+  font-family: 'Fira Code', 'Consolas', 'Liberation Mono', monospace;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text);
+  font-size: 0.9em;
+}
+/* Boxed environments — definition / theorem / note / proof — match textbook.css */
+.about-body .box {
+  border-left: 3px solid;
+  padding: 10px 14px;
+  margin: 12px 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.about-body .box .label {
+  font-variant: small-caps;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  margin-right: 8px;
+}
+.about-body .box.definition { background: var(--def-bg); border-color: var(--def-ru); }
+.about-body .box.definition .label { color: #8a6b1a; }
+.about-body .box.theorem    { background: var(--thm-bg); border-color: var(--thm-ru); }
+.about-body .box.theorem    .label { color: var(--accent2); }
+.about-body .box.note       { background: var(--note-bg); border-color: var(--note-ru); }
+.about-body .box.note       .label { color: #7a5a2c; }
+.about-body .katex { font-size: 1.02em; }
+.about-body .katex-display { margin: 10px 0 !important; }
+.about-body table.mathtable {
+  border-collapse: collapse;
+  margin: 10px 0;
+  font-size: 11.5px;
+  color: var(--muted2);
+}
+.about-body table.mathtable th,
+.about-body table.mathtable td {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  text-align: left;
+}
+.about-body table.mathtable th {
+  background: var(--panel2);
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.about-body .toc {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.about-body .toc a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 11px;
+}
+.about-body .toc a:hover { text-decoration: underline; }
+.about-body .toc ol { margin: 4px 0 0 0; padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="header-row">
+  <h1>DADA Rate Recovery — Interactive</h1>
+  <button class="about-btn" id="about-btn">About / Math</button>
+</div>
+<div class="subtitle">
+  Type a DADA string, set a seed, pick a preset (Predetermined / Mixed / Kinetic) or drive the sliders directly. The splicing regime vector is θ = (η, σ, α, K). Hover any node for its sashimi; double-click to pin it. Click an edge to edit its rate by hand.
+</div>
+
+<!-- ────────────────── Top bar: DADA + Seed + Apply + mode toggle + actions ────────────────── -->
+<div class="panel top-bar">
+  <div class="field">
+    <label>DADA string <span class="help-icon" tabindex="0" data-help="Alternating donor/acceptor splice-site string. D = 5′ splice site, A = 3′ splice site. All (D, A) pairs with D before A enumerate as junctions; each maximal compatible subset of junctions is an isoform state.">?</span></label>
+    <input id="dada-input" type="text" value="DADADA" placeholder="DADADADA" spellcheck="false">
+  </div>
+  <div class="field">
+    <label>Seed <span class="help-icon" tabindex="0" data-help="RNG seed for reproducibility. Every Randomize under the same seed produces the same instance; changing the seed gives a new draw while leaving the structure fixed.">?</span></label>
+    <input id="seed-input" type="number" value="42" min="0" max="2147483647">
+  </div>
+  <button class="btn accent" id="apply-btn">Apply</button>
+  <div class="field">
+    <label>Preset <span class="help-icon" tabindex="0" data-help="Three regime presets that set η, σ, α to canonical values. All three draw from the same Mixed-Dirichlet generator — only the slider values differ. You can move any slider after clicking a preset; nothing is disabled.">?</span></label>
+    <div class="toggle-group" id="mode-toggle">
+      <button data-mode="predetermined">Predetermined</button>
+      <button data-mode="mixed" class="on">Mixed</button>
+      <button data-mode="kinetic">Kinetic</button>
+    </div>
+  </div>
+  <button class="btn accent" id="randomize-btn">Randomize</button>
+  <button class="btn" id="reset-btn">Reset</button>
+  <span class="status" id="status"></span>
+</div>
+
+<!-- ────────────────── Priors (always visible) ────────────────── -->
+<div class="panel2">
+  <div class="section-head">
+    Priors
+    <span class="help-icon" tabindex="0" data-help="The splicing regime vector θ = (η, σ, α, K). η and α parameterise the Mixed-Dirichlet prior. σ is the log-normal spread of junction amplitudes. K is reserved. When the Kinetic mode is active, η, α, and K are ignored and only σ drives rate generation.">?</span>
+  </div>
+
+  <div class="slider-block" id="block-eta">
+    <span class="slabel">Structure η</span>
+    <input type="range" min="0" max="1" step="0.01" value="0.3" id="s-eta">
+    <span class="sval" id="v-eta">0.30</span>
+    <span class="help-icon" tabindex="0" data-help="Fraction of parents active per child. k = max(1, round(η·m)). η = 0 ⇒ strict tree (one parent per child). η = 1 ⇒ full graph (every parent active). Only this knob changes which edges are in the active subgraph.">?</span>
+  </div>
+
+  <div class="slider-block" id="block-sigma">
+    <span class="slabel">Spread σ</span>
+    <input type="range" min="0" max="3" step="0.05" value="1.0" id="s-sigma">
+    <span class="sval" id="v-sigma">1.00</span>
+    <span class="help-icon" tabindex="0" data-help="Log-normal spread of per-junction amplitudes. ρ_j = R₀·exp(σ·Z). σ = 0: every junction has identical intrinsic rate. σ large: junctions span orders of magnitude.">?</span>
+  </div>
+
+  <div class="slider-block" id="block-alpha">
+    <span class="slabel">Concentration log₁₀α</span>
+    <input type="range" min="-2" max="2" step="0.1" value="0" id="s-alpha">
+    <span class="sval" id="v-alpha">α = 1.00</span>
+    <span class="help-icon" tabindex="0" data-help="Dirichlet concentration on the k active-parent weights. α ≪ 1 ⇒ one active parent dominates (winner-take-all). α = 1 ⇒ uniform on the simplex. α ≫ 1 ⇒ equal flow (uniform weights).">?</span>
+  </div>
+
+</div>
+
+<!-- ────────────────── Additional Parameters (collapsed by default) ────────────────── -->
+<details class="collapse-panel">
+  <summary>Additional Parameters</summary>
+  <div class="collapse-body">
+
+    <div class="slider-block">
+      <span class="slabel">Export profile</span>
+      <select id="export-profile">
+        <option value="constant">Constant (oblivious)</option>
+        <option value="linear">Linear ramp</option>
+        <option value="power" selected>Parabolic (c²)</option>
+        <option value="exp">Exponential (late commitment)</option>
+        <option value="sigmoid">Sigmoid (switch-like)</option>
+      </select>
+      <span class="help-icon" tabindex="0" data-help="Shape of λ_i = λ_base·f(c_i) where c_i is the splice-completion coordinate. f(0) = nullFrac, f(1) = 1. Selects how readily partially-spliced isoforms are exported.">?</span>
+    </div>
+
+    <div class="slider-block">
+      <span class="slabel">Unspliced export</span>
+      <input type="range" min="0" max="1" step="0.01" value="1" id="s-nullfrac">
+      <span class="sval" id="v-nullfrac">1.00</span>
+      <span class="help-icon" tabindex="0" data-help="The fraction f(0) — relative export rate at the null (unspliced) state. 0 ⇒ unspliced pre-mRNA is retained in the nucleus. 1 ⇒ export is constant across splice states.">?</span>
+    </div>
+
+    <div class="slider-block">
+      <span class="slabel">Observation noise κ</span>
+      <input type="range" min="0" max="6" step="0.1" value="0" id="s-kappa">
+      <span class="sval" id="v-kappa">off</span>
+      <span class="help-icon" tabindex="0" data-help="Stochastic likelihood: y ~ Dirichlet(10^κ · f(r)). κ = 0 is noiseless (sandbox historical default). κ = 2 is roughly '100 reads worth of certainty'; κ = 5 is near-noiseless. Useful for studying how observation noise interacts with identifiability.">?</span>
+    </div>
+
+    <div class="slider-block" id="block-K">
+      <span class="slabel">K <span style="font-size:10px;color:var(--muted);font-weight:400;font-style:italic">(reserved)</span></span>
+      <input type="range" min="0" max="1" step="0.02" value="0" id="s-K">
+      <span class="sval" id="v-K">0.00</span>
+      <span class="help-icon" tabindex="0" data-help="Reserved axis for a fourth SRV parameter (kinetic-fraction or per-edge jitter σ_r). Currently a no-op — the slider exists so we can wire a semantic to it later without restructuring.">?</span>
+    </div>
+
+    <canvas class="profile-canvas" id="profile-canvas" style="margin-top:8px"></canvas>
+  </div>
+</details>
+
+<!-- ────────────────── Solver ────────────────── -->
+<div class="panel2">
+  <div class="section-head">
+    Solver
+    <span class="help-icon" tabindex="0" data-help="Which inverse procedure attempts to recover r from y. Per-edge NNLS treats each edge as an independent unknown; Pooled enforces r_k = ρ_{j(k)}; Ridge/LASSO/Smooth add L2/L1/Tikhonov regularisation with strength λ.">?</span>
+  </div>
+
+  <div class="slider-block">
+    <span class="slabel">Mode <span style="font-size:10px;color:var(--muted);font-weight:400">(what does the solver know?)</span></span>
+    <select id="solver-mode" style="grid-column:2 / 4">
+      <option value="theta-aware" selected>θ-aware — solver knows the regime (η, σ, α), discovers the active subgraph from data via η-IHT</option>
+      <option value="oracle">Oracle — solver receives the true active mask (cheating; visualisation only)</option>
+      <option value="naive">Naive — solver knows nothing about θ; vanilla NNLS on full topology</option>
+    </select>
+    <span class="help-icon" tabindex="0" data-help="θ-aware: legitimate inference under the regime — the solver knows η (per-child cardinality) and uses it for iterative hard thresholding. Oracle: the generator hands the solver its activeMask directly — useful for visualising the upper bound on what's recoverable given the regime. Naive: no θ information — what raw NNLS produces from a single IPD without any prior structure. The R² differences between the three modes show how much information θ buys you.">?</span>
+  </div>
+
+  <div class="slider-block">
+    <span class="slabel">Solver</span>
+    <select id="solver-select">
+      <option value="per-edge" selected>per-edge NNLS</option>
+      <option value="pooled">pooled NNLS (one rate per junction)</option>
+      <option value="junction-shrinkage">junction-shrinkage NNLS (structural, λ-tunable)</option>
+      <option value="ridge">ridge NNLS (L2 → 0)</option>
+      <option value="lasso">LASSO NNLS (L1 penalty)</option>
+      <option value="smooth">smooth NNLS (L2 → R₀)</option>
+    </select>
+    <span class="help-icon" tabindex="0" data-help="Per-edge is the generic inverse; Pooled is exact when the prior is Pure Kinetic; Ridge/LASSO/Smooth address underdetermined cases with different regularisation choices. In θ-aware mode, the chosen solver runs inside each iteration of η-IHT, except 'pooled' which bypasses IHT entirely.">?</span>
+  </div>
+  <div class="slider-block" id="block-lambda" style="display:none">
+    <span class="slabel">Reg. strength log₁₀λ</span>
+    <input type="range" min="-10" max="2" step="0.1" value="-6" id="s-lambda">
+    <span class="sval" id="v-lambda">λ = 1e-6</span>
+    <span class="help-icon" tabindex="0" data-help="Regularisation strength. Very small λ recovers per-edge NNLS behaviour; λ ≳ 1 saturates the regulariser's prior (rates near 0 for ridge/lasso, near R₀ for smooth).">?</span>
+  </div>
+</div>
+
+<!-- ────────────────── Toggles ────────────────── -->
+<div class="panel2 toggles">
+  <label><input type="checkbox" id="show-recovered"> Overlay recovered rates (dashed)</label>
+  <label><input type="checkbox" id="show-ident"> Color transitions by identifiability</label>
+  <label><input type="checkbox" id="show-all"> Show all nodes &amp; edges <span style="color:var(--muted);font-size:10px">(for manual rate editing)</span></label>
+</div>
+
+<!-- ────────────────── DAG + diagnostics side-table ────────────────── -->
+<div class="viz-row">
+  <div class="dag-container" id="dag-container"></div>
+  <div class="diag-panel">
+    <div class="section-head" style="margin-bottom:6px">Diagnostics</div>
+    <div class="verdict good" id="verdict">RATES RECOVERABLE</div>
+    <table class="diag-table" id="diag-table">
+      <tr><td class="lbl">Balance rows</td><td class="val" id="d-rows">—</td></tr>
+      <tr><td class="lbl">Unknowns</td><td class="val" id="d-cols">—</td></tr>
+      <tr><td class="lbl">rank(A)</td><td class="val" id="d-rank">—</td></tr>
+      <tr><td class="lbl">Nullity</td><td class="val" id="d-null">—</td></tr>
+      <tr><td class="lbl">log₁₀ κ(A)</td><td class="val" id="d-cond">—</td></tr>
+      <tr><td class="lbl">R² (observable)</td><td class="val" id="d-r2">—</td></tr>
+      <tr><td class="lbl">Observable edges</td><td class="val" id="d-obs">—</td></tr>
+      <tr><td class="lbl">‖A r̂ − y‖₂</td><td class="val" id="d-resid">—</td></tr>
+      <tr><td class="lbl">p(s₀) unspliced</td><td class="val" id="d-p0">—</td></tr>
+      <tr><td class="lbl">Active edges</td><td class="val" id="d-active">—</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ────────────────── Rate recovery: scatter + table ────────────────── -->
+<div class="panel2">
+  <div class="section-head">
+    Rate recovery — observable edges
+    <span class="help-icon" tabindex="0" data-help="Scatter of true vs recovered rate, restricted to edges whose source and destination isoforms are both observable above threshold. Diagonal is perfect recovery. R² is reported for this set.">?</span>
+  </div>
+  <div class="recovery-row">
+    <canvas class="recovery-canvas" id="scatter-obs-canvas"></canvas>
+    <div>
+      <div class="recovery-info">Click any true rate below to edit it directly. Inactive edges are hidden by default.</div>
+      <div id="table-container"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating sashimi tooltip (hover) -->
+<div id="sashimi-tip">
+  <div class="title" id="st-title">—</div>
+  <div class="sub" id="st-sub">—</div>
+  <canvas id="st-canvas" width="260" height="60"></canvas>
+</div>
+
+<!-- Edge-rate edit popup -->
+<div id="edge-popup">
+  <div class="ep-title" id="ep-title"></div>
+  <input id="ep-input" type="number" step="0.01" min="0">
+  <button class="btn accent" onclick="applyEdgeRate()">Set</button>
+  <button class="btn" onclick="closeEdgePopup()">Cancel</button>
+</div>
+
+<!-- Legacy node-hover tooltip (used internally by edges only) -->
+<div id="tooltip" style="position:fixed;display:none;background:rgba(251,248,241,0.98);border:1px solid var(--accent);border-radius:6px;padding:8px 10px;color:var(--text);font-size:11px;z-index:1000;pointer-events:none;max-width:320px;box-shadow:0 4px 12px rgba(122,75,43,0.18)"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ABOUT / MATH MODAL
+     ═══════════════════════════════════════════════════════════ -->
+<div class="about-overlay" id="about-overlay">
+  <div class="about-modal">
+    <div class="about-header">
+      <h2>How this works — math &amp; assumptions</h2>
+      <button class="about-close" id="about-close">Close (Esc)</button>
+    </div>
+    <div class="about-body">
+
+      <div class="toc">
+        <b style="color:var(--text)">Contents</b>
+        <ol>
+          <li><a href="#about-overview">Overview and goal</a></li>
+          <li><a href="#about-srv">The Splicing Regime Vector θ</a></li>
+          <li><a href="#about-dada">DADA strings and junctions</a></li>
+          <li><a href="#about-states">Isoform states (the graph)</a></li>
+          <li><a href="#about-forward">Forward model (CTMC steady state)</a></li>
+          <li><a href="#about-export">Export kinetics</a></li>
+          <li><a href="#about-inverse">The inverse problem</a></li>
+          <li><a href="#about-generator">Prior regimes (points and paths in θ-space)</a></li>
+          <li><a href="#about-observable">The observable mask (dual threshold)</a></li>
+          <li><a href="#about-identifiability">Solvers, regularisation, and identifiability</a></li>
+          <li><a href="#about-r2">R² and residual</a></li>
+          <li><a href="#about-reading">Reading the visualisation</a></li>
+          <li><a href="#about-example">Worked example — four solvers on Mixed DADADA</a></li>
+          <li><a href="#about-subgraph-posterior">Posterior over active subgraphs — the principled view</a></li>
+          <li><a href="#about-assumptions">Assumptions in one place</a></li>
+        </ol>
+      </div>
+
+      <h3 id="about-overview">1. Overview and goal</h3>
+      <p>
+        Given the <b>isoform-proportion data (IPD)</b> produced by a splicing system, we want to recover the underlying kinetic <b>rates</b>. Whether that's possible — and with which solver — depends on the <em>splicing regime</em> the gene obeys. A regime here is any structural prior on the rate vector and the active subgraph: topology constraints, pooling of rates across junctions, how much competition is allowed at branching states, and so on.
+      </p>
+      <p>
+        We package a regime as a <b>splicing regime vector</b> $\theta = (\theta_1, \theta_2, \ldots)$ — see <a href="#about-srv">step 2</a>. Every gene is assumed to sit at some point in $\theta$-space; observing an IPD is an observation about which region its $\theta$ is in; and for every $\theta$ region, one of the five solvers (step 10) is <em>best</em> in a sharp theoretical sense.
+      </p>
+      <p>
+        The goal of this sandbox is modest and deliberate: identify the smallest set of SRV coordinates that cover the splicing regimes we care about, and characterise where <b>analytic direct inference</b> (NNLS and its regularised variants) succeeds and where it fails.
+      </p>
+
+      <h3 id="about-srv">2. The Splicing Regime Vector θ</h3>
+      <p>
+        The SRV is a compact parametric description of the prior on the splicing rate vector. Fixing $\theta$ determines (i) which subgraph of the DADA graph is active, (ii) how rates distribute on active edges, and (iii) how much variation there is between junctions.
+      </p>
+      <p>$$ \theta \;=\; (\eta,\, \sigma,\, \alpha,\, K) \;\in\; [0,1] \times \mathbb{R}_+ \times \mathbb{R}_+ \times [0,1]. $$</p>
+      <p>
+        Three active axes plus one reserved. Every axis is orthogonal in the sense that it moves a distinct statistic of the generated rate vector: $\sigma$ perturbs per-<em>junction</em> amplitudes, $\eta$ perturbs the <em>active-subgraph support</em>, and $\alpha$ perturbs the <em>within-child weight distribution</em>.
+      </p>
+      <ul>
+        <li><b>$\eta \in [0, 1]$ — structure.</b> Fraction of parents active per child: $k = \max(1,\,\mathrm{round}(\eta \cdot m))$. The active subset of size $k$ is drawn uniformly from the $m$ parents. $\eta = 0 \Rightarrow k = 1$ (strict tree); $\eta = 1 \Rightarrow k = m$ (full graph).</li>
+        <li><b>$\sigma \in [0, \infty)$ — spread.</b> Log-normal scatter of junction amplitudes $\rho_j = R_0 \cdot \exp(\sigma \cdot \mathcal{N}(0,1))$. Independent across junctions.</li>
+        <li><b>$\alpha \in (0, \infty)$ — concentration.</b> Dirichlet concentration for the active-parent weights $(w_i)_{i \in \mathcal{S}_c} \sim \mathrm{Dir}(\alpha, \ldots, \alpha)$. $\alpha \to 0$ one parent dominates; $\alpha \to \infty$ uniform weights. The UI slider maps $\log_{10}\alpha \in [-2, 2]$.</li>
+        <li><b>$K$ — reserved.</b> Placeholder axis, currently a no-op. Candidates for later: a kinetic-fraction axis, a per-edge log-normal jitter $\sigma_r$, or observation concentration $\kappa$.</li>
+      </ul>
+      <p>
+        The three UI presets (Predetermined / Mixed / Kinetic) are specific points in $(\eta, \alpha)$-space that reproduce each canonical regime under the single Mixed-Dirichlet sampler:
+      </p>
+      <table class="mathtable">
+        <tr><th>preset</th><th>$\eta$</th><th>$\alpha$</th><th>active-subgraph</th><th>weights</th></tr>
+        <tr><td>Predetermined</td><td>0.0</td><td>1.0</td><td>tree ($k=1$ per child)</td><td>$w = 1$ (single-element Dirichlet)</td></tr>
+        <tr><td>Mixed</td><td>0.5</td><td>1.0</td><td>$k \approx m/2$ per child</td><td>$\mathrm{Dir}(1,\ldots,1)$ — uniform on simplex</td></tr>
+        <tr><td>Kinetic</td><td>1.0</td><td>100</td><td>full graph</td><td>$w_i \approx 1/m$ — junction-pooled limit</td></tr>
+      </table>
+      <p>
+        Any slider can be moved freely after a preset is clicked; the presets are just canonical landmarks.
+      </p>
+
+      <h3 id="about-dada">3. DADA strings and junctions</h3>
+      <p>
+        A <b>DADA string</b> is a sequence of splice-site letters: <code>D</code> is a donor (5′ splice site) and <code>A</code> is an acceptor (3′ splice site). For example, <code>DADADA</code> is a gene with three donors and three acceptors in alternating order along the transcript.
+      </p>
+      <p>
+        A <b>junction</b> is a pair $(d, a)$ where $d$ is a donor position, $a$ is an acceptor position, and $d < a$. Each junction removes the intron spanning positions $[d, a)$. All valid junctions are enumerated as
+      </p>
+      <p>$$ \mathcal{J} \;=\; \bigl\{\, (i, j) \;:\; \mathrm{site}_i = \mathtt{D},\ \mathrm{site}_j = \mathtt{A},\ i < j \,\bigr\}. $$</p>
+
+      <h4>Compatibility</h4>
+      <p>Two junctions can coexist in the same mature isoform iff their half-open intervals are disjoint and they don't share a splice site:</p>
+      <p>$$ \mathrm{compatible}\bigl((d_1, a_1),\, (d_2, a_2)\bigr) \;\iff\; d_1 \neq d_2 \,\land\, a_1 \neq a_2 \,\land\, \bigl(a_1 \leq d_2 \,\lor\, a_2 \leq d_1\bigr). $$</p>
+      <p>
+        Nested junctions (one inside another) are <em>not</em> allowed here — this tool models only strictly sequential splicing along the transcript.
+      </p>
+
+      <h3 id="about-states">4. Isoform states (the graph)</h3>
+      <p>
+        A state $s$ is a set of compatible junctions already spliced out. The <b>null state</b> $s = \emptyset$ is the unspliced pre-mRNA. A <b>terminal state</b> is one where no further compatible junction can be added — no more splicing is possible.
+      </p>
+      <p>States and edges are built by breadth-first enumeration:</p>
+      <ol>
+        <li>Start with the null state.</li>
+        <li>For each state $s$ and each junction $j \notin s$ compatible with all of $s$, create an edge $s \to s \cup \{j\}$.</li>
+        <li>Every edge is labelled by the junction it adds.</li>
+      </ol>
+      <p>
+        The <b>layer</b> of a state is the number of junctions it contains, i.e. how far along the splicing cascade it sits. Layer 0 is null; the highest layer contains the terminal states.
+      </p>
+
+      <h3 id="about-forward">5. Forward model — CTMC steady state</h3>
+      <p>
+        The system is a continuous-time Markov chain on the isoform state graph. New pre-mRNA appears at the null state at a constant <b>transcription rate</b> (fixed at 1 — it just sets the overall mass scale). From each state, molecules either splice further (to a neighbour) or are <b>exported</b> out of the nucleus and counted as that isoform.
+      </p>
+      <p>Let $p_i$ be the steady-state abundance of state $i$, $r_{i \to j}$ the rate of the edge from $i$ to $j$, and $\lambda_i$ the export rate from state $i$. The steady-state balance, for every state $i$, is</p>
+      <p>$$ \sum_j r_{j \to i}\, p_j \;=\; \Bigl(\lambda_i + \sum_j r_{i \to j}\Bigr)\, p_i, $$</p>
+      <p>with an additional $+1$ on the right-hand side of state $0$ to account for transcription. Written as a linear system in the abundance vector $p$:</p>
+      <p>$$ Q\, p \;=\; -b, \qquad Q_{ii} = -\Bigl(\lambda_i + \sum_j r_{i \to j}\Bigr), \qquad Q_{ji} = r_{i \to j}\ (i \neq j), \qquad b_0 = 1. $$</p>
+      <p>
+        We solve this directly with Gaussian elimination, clip to non-negatives (numerical safety), and <b>normalise</b> so that $\sum_i p_i = 1$. Every abundance in this tool is therefore a <em>fraction</em> — the <em>isoform-proportion data</em> (IPD).
+      </p>
+
+      <h3 id="about-export">6. Export kinetics</h3>
+      <p>
+        Export is the process that "measures" an isoform. Once a molecule is exported, it's counted as whatever state it was in at that moment. The export rate $\lambda_i$ depends on how far along the splicing path state $i$ sits. Define the <b>splice-completion coordinate</b>
+      </p>
+      <p>$$ c_i \;=\; \frac{\mathrm{layer}(i)}{\mathrm{layer}_{\max}} \;\in\; [0, 1], \qquad \lambda_i \;=\; \lambda_{\mathrm{base}} \cdot f(c_i). $$</p>
+      <p>
+        $\lambda_{\mathrm{base}}$ is pinned at $1.0$ so every rate in the interface is expressed in units of the export rate. The shape $f(c)$ satisfies $f(0) = \mathrm{nullFrac}$ and $f(1) = 1$; you pick its functional form from the <b>export profile</b> dropdown. The available profiles are:
+      </p>
+      <ul>
+        <li><b>constant</b> — $f(c) = 1$ everywhere; export is oblivious to splice state.</li>
+        <li><b>linear</b> — $f(c) = \mathrm{nullFrac} + (1 - \mathrm{nullFrac}) \cdot c$.</li>
+        <li><b>parabolic</b> — $f(c) = \mathrm{nullFrac} + (1 - \mathrm{nullFrac}) \cdot c^2$; commitment ramps up.</li>
+        <li><b>exponential</b> — $f(c) = \mathrm{nullFrac} + (1 - \mathrm{nullFrac}) \cdot (e^{3c} - 1)/(e^{3} - 1)$; sharp commitment near the end.</li>
+        <li><b>sigmoid</b> — switch-like, transitions around $c = 0.5$.</li>
+      </ul>
+      <p>
+        <b>nullFrac</b> controls how readily unspliced RNA escapes the nucleus. When $\mathrm{nullFrac} \approx 0$, only fully spliced products are exported; when $\mathrm{nullFrac} = 1$, export is constant.
+      </p>
+      <div class="box note"><span class="label">Remark.</span>
+        The IPD is biased by the export shape. The same set of splicing rates produces different IPDs if the export profile changes, and the inverse solver assumes it <em>knows</em> $f(c)$. "Model mismatch" in this tool usually means simulating with one profile and solving as if another were in effect.
+      </div>
+
+      <h3 id="about-inverse">7. The inverse problem</h3>
+      <p>The observations are the IPDs $p_i$. The unknowns are the edge rates $r_k$. The steady-state equation rearranges into a <em>linear</em> system in $r$ alone: for each non-source state $i$,</p>
+      <p>$$ p_i \cdot \Bigl(\lambda_i + \sum_{k:\,\mathrm{src}(k) = i} r_k\Bigr) \;=\; \sum_{k:\,\mathrm{dst}(k) = i} r_k\, p_{\mathrm{src}(k)}. $$</p>
+      <p>Moving everything to one side gives a linear system $A\, r = c$ with</p>
+      <p>$$ A_{i, k} \;=\; \begin{cases} +\, p_{\mathrm{src}(k)} & \text{if edge } k \text{ ends at } i, \\ -\, p_{\mathrm{src}(k)} & \text{if edge } k \text{ starts at } i, \\ 0 & \text{otherwise}, \end{cases} \qquad c_i \;=\; \lambda_i\, p_i. $$</p>
+      <p>
+        Two subtleties in how we actually build $A$ and $c$:
+      </p>
+      <ul>
+        <li>Only columns for edges whose <em>source</em> state has observed non-zero abundance ($p_{\mathrm{src}} > 0$) are included — an edge that starts nowhere can't appear in the data.</li>
+        <li>A row $i$ is dropped from the solve if $i$ is a <em>pure exit</em> — no included edge ends at it. Its balance equation is empty and would be numerically degenerate.</li>
+      </ul>
+      <p>We solve $A\, r = c$ subject to $r \geq 0$ using <b>non-negative least squares</b> (Lawson–Hanson NNLS). Rates can't be negative, and NNLS is the right constrained projection.</p>
+
+      <h3 id="about-generator">8. The Mixed-Dirichlet generator</h3>
+      <p>
+        A single generator parameterised by $\theta = (\eta, \sigma, \alpha)$ produces every regime the sandbox can show. The three UI presets are canonical points in $(\eta, \alpha)$-space; the sliders move freely in between.
+      </p>
+
+      <h4>Stage 0 — junction amplitudes (σ)</h4>
+      <p>$$ \rho_j \;\sim\; R_0 \cdot \exp\bigl(\sigma \cdot \mathcal{N}(0, 1)\bigr), \qquad R_0 = 75, \qquad j = 1, \ldots, K_{\mathrm{junc}}. $$</p>
+
+      <h4>Stage 1 — active subgraph (η)</h4>
+      <p>For each child state $c$ with $m$ parents, choose the active-parent count and a uniform subset of that size:</p>
+      <p>$$ k_c \;=\; \max\!\bigl(1,\ \mathrm{round}(\eta \cdot m)\bigr), \qquad \mathcal{S}_c \;\sim\; \mathrm{UniformSubset}\bigl(\{1, \ldots, m\},\, k_c\bigr). $$</p>
+
+      <h4>Stage 2 — weights on the active set (α)</h4>
+      <p>Draw a symmetric Dirichlet over the $k_c$ active parents and convert to rates:</p>
+      <p>$$ (w_i)_{i \in \mathcal{S}_c} \;\sim\; \mathrm{Dirichlet}(\alpha, \ldots, \alpha), \qquad \mathrm{rate}(p_i \to c) \;=\; \begin{cases} \rho_{j(p_i \to c)} \cdot (k_c \cdot w_i), & i \in \mathcal{S}_c, \\ 0, & \text{otherwise.} \end{cases} $$</p>
+      <p>
+        The factor $k_c$ in front of $w_i$ keeps the expected rate per active edge fixed at $\rho_j$ across the whole $(\eta, \alpha)$-plane. Dropped parents get rate exactly $0$ — they're genuinely absent from the active subgraph.
+      </p>
+
+      <div class="box definition"><span class="label">Preset points.</span>
+        <ul style="margin-top:4px">
+          <li><b>Predetermined</b> — $\eta = 0,\ \alpha = 1$. $k_c = 1$ per child, so $w = 1$ trivially. Strict tree; every active edge has rate $\rho_j$.</li>
+          <li><b>Mixed</b> — $\eta = 0.5,\ \alpha = 1$. Half the parents active per child. Uniform-on-simplex weights give graded flux splits.</li>
+          <li><b>Kinetic</b> — $\eta = 1,\ \alpha = 100$. Full graph active; weights $\approx 1/m$ so $\mathrm{rate} \approx \rho_j$. Approaches the pure junction-pooled kinetic limit.</li>
+        </ul>
+      </div>
+
+      <div class="box note"><span class="label">Observation noise.</span>
+        A Dirichlet-$\kappa$ likelihood $y \sim \mathrm{Dirichlet}(10^\kappa \cdot f(r))$ is available in Additional Parameters. At $\kappa = 0$ the sandbox is noiseless (y = f(r) exactly). Larger $\kappa$ = more reads = less noise; $\kappa \gtrsim 4$ is effectively noiseless.
+      </div>
+
+      <h4>Identifiability summary</h4>
+      <table class="mathtable">
+        <tr><th>preset</th><th>$\theta$</th><th>active subgraph</th><th>per-edge NNLS</th><th>pooled NNLS</th></tr>
+        <tr><td>Predetermined</td> <td>$\eta = 0$</td>                <td>tree</td>                      <td><b>exact</b> — tree has $N\!-\!1$ edges, matching the $N\!-\!1$ balance constraints</td> <td>exact on the tree if each junction appears once</td></tr>
+        <tr><td>Mixed</td>         <td>$\eta \approx 0.5$</td>        <td>$\sim m/2$ per child</td>       <td>typically identifiable for small graphs; fails when active-column count exceeds rank</td> <td>biased unless rates are actually junction-pooled</td></tr>
+        <tr><td>Kinetic</td>       <td>$\eta = 1,\ \alpha \gg 1$</td> <td>full graph, rates $\approx \rho_j$</td> <td>fails for $K \geq 3$ (more unknowns than balance rows)</td> <td><b>exact</b> — $K_{\mathrm{junc}}$ unknowns are overdetermined by $N$ rows</td></tr>
+      </table>
+
+      <h3 id="about-observable">9. The observable mask (dual threshold)</h3>
+      <p>
+        An edge's rate is only recoverable from data if <em>both</em> its source and destination isoforms have measurable abundance. If either $p_{\mathrm{src}}$ or $p_{\mathrm{dst}}$ is effectively zero, the edge contributes nothing the solver can see, and asking about its "rate error" is ill-posed.
+      </p>
+      <p>Two separate thresholds handle analytics and visualization.</p>
+
+      <h4>Analytical mask (R² and solver)</h4>
+      <p>$$ \tau_{\mathrm{obs}} \;=\; \max\bigl(10^{-12},\ \textstyle\max_i p_i \cdot 10^{-4}\bigr), \qquad \mathrm{obs}[i] \;=\; \bigl(p_i > \tau_{\mathrm{obs}}\bigr), \qquad \mathrm{obs}[\text{edge}] \;=\; \mathrm{obs}[\mathrm{src}] \land \mathrm{obs}[\mathrm{dst}]. $$</p>
+      <p>
+        The threshold is <em>relative</em> to the largest observed abundance. This is deliberate: in real measurements, anything four orders of magnitude below the dominant isoform is below the noise floor. It also prevents cascade artefacts — states that are reachable only through a vanishing rate sit at near-machine-precision abundance but aren't <em>actually</em> observable. This strict mask is used for the $R^2$ calculation and the "observable edges" scatter plot.
+      </p>
+
+      <h4>Visual mask (DAG display)</h4>
+      <p>$$ \tau_{\mathrm{vis}} \;=\; \max\bigl(10^{-14},\ \textstyle\max_i p_i \cdot 10^{-6}\bigr), \qquad \mathrm{vis}[i] \;=\; \bigl(p_i > \tau_{\mathrm{vis}}\bigr), \qquad \mathrm{vis}[\text{edge}] \;=\; \mathrm{vis}[\mathrm{src}] \land \mathrm{vis}[\mathrm{dst}]. $$</p>
+      <p>
+        The visual mask is $100\times$ more lenient than the analytical mask. By default (<b>Show all nodes &amp; edges</b> off) the DAG uses the visual mask plus a rate-activity check to keep only active, observable edges on screen. Turning the toggle on renders every structural edge — useful when you want to click-and-edit rates on currently-inactive transitions. This prevents a common rendering artefact: with sparse, high-spread parameter settings, intermediate states can have abundances that are below the strict analytical threshold but still represent real pathway nodes. Hiding them disconnects the visible graph into disjoint clusters. The lenient visual mask keeps the DAG topologically connected while still hiding truly negligible states.
+      </p>
+      <p>
+        The analytical mask (strict) controls the $R^2$ calculation, the recovery table, and the "observable edges" scatter plot. The visual mask (lenient) controls only the DAG rendering. See <a href="#about-r2">step 11</a>.
+      </p>
+
+      <h3 id="about-identifiability">10. Solvers, regularisation, and identifiability</h3>
+
+      <h4>The three solver modes (oracle / θ-aware / naive)</h4>
+      <p>
+        Every solver below can be run in one of three modes, controlled by the <b>Mode</b> selector. These are not different algorithms — they are different <em>information</em> the solver receives about the regime:
+      </p>
+
+      <div class="box definition"><span class="label">Oracle mode.</span>
+        The solver receives the generator's <code>activeMask</code> — the specific edges that carry non-zero rate in this draw. The solver's job reduces to fitting numbers on a known support.<br><br>
+        Oracle mode <em>cheats</em>: the active subgraph is part of the latent state we'd want to infer. Not a defensible answer to "given y, what is r?" Useful only as a visualisation of the upper bound — what each solver could achieve if we already knew the subgraph.
+      </div>
+
+      <div class="box definition"><span class="label">θ-aware mode (the honest middle ground).</span>
+        The solver is given $\theta = (\eta, \sigma, \alpha, K)$ but <em>not</em> the realisation's <code>activeMask</code>. This is what a real Bayesian inference at known $\theta$ would do.<br><br>
+        Implementation: <b>iterative hard thresholding (IHT)</b>. For each child state $c$ with $m_c$ parents, $\eta$ specifies the cardinality $k_c = \max(1, \mathrm{round}(\eta \cdot m_c))$ of the active set; the solver iteratively
+        <ol style="margin-top:4px">
+          <li>solves NNLS on the current candidate active set,</li>
+          <li>retains the top-$k_c$ incoming edges per child by recovered rate,</li>
+          <li>repeats until the mask is stable.</li>
+        </ol>
+        The first iteration uses junction-shrinkage at small λ (overdetermined, unique solution) so the thresholding has dense magnitudes to rank; later iterations refine. IHT discovers <em>which</em> $k_c$ edges are active from the IPD alone.
+      </div>
+
+      <div class="box definition"><span class="label">Naive mode.</span>
+        The solver receives only the topology and $p_{\mathrm{obs}}$ — no $\theta$, no activeMask. This is what raw NNLS does without any prior structure.<br><br>
+        Naive mode is what you'd get if you walked into the inverse problem cold. It serves as the lower bound: anything any of our solvers achieve over naive is the value of the prior information.
+      </div>
+
+      <h4>What the three modes tell you</h4>
+      <p>The R² gap between modes is informative:</p>
+      <ul>
+        <li><b>oracle − θ-aware</b> = how much the realisation's specific active subgraph helps beyond just knowing the regime. A small gap means η-IHT is recovering the structure well; a large gap means there are many ways to fit y consistent with η, and we'd need something stronger (more data, posterior inference) to pin down which.</li>
+        <li><b>θ-aware − naive</b> = how much θ is worth as prior information. A large gap means θ is informative; a small gap means even with θ we can't separate the answer from noise.</li>
+        <li><b>oracle − naive</b> = the total cost of not knowing anything about the regime.</li>
+      </ul>
+
+      <p>
+        Empirically on DADADADA at seed 42:
+      </p>
+      <table class="mathtable">
+        <tr><th>preset</th><th>oracle (per-edge)</th><th>θ-aware (IHT)</th><th>naive (per-edge)</th></tr>
+        <tr><td>Predetermined</td><td>1.00</td><td>0.40</td><td>−1.15</td></tr>
+        <tr><td>Mixed</td><td>0.92</td><td>0.82</td><td>−1.05</td></tr>
+        <tr><td>Kinetic</td><td>−1.63</td><td>0.99</td><td>−1.63</td></tr>
+      </table>
+      <p style="font-size:11.5px;color:var(--muted)">(Kinetic in the per-edge oracle column is bad because per-edge NNLS on a full graph has $M > N$; pooled NNLS, which assumes the regime's structure, gets to 1.0. θ-aware's first iteration uses junction-shrinkage which recovers the same answer.)</p>
+
+      <p>
+        The honest interpretation: <b>θ-aware does most of the work that oracle does</b>, except in the Predetermined corner where the active tree's exact identity matters — and that gap is the cardinality-shell ambiguity discussed in §14, which a single noiseless IPD cannot resolve.
+      </p>
+
+      <h4>The five solvers (used inside any mode)</h4>
+      <p>
+        Five solver variants are implemented, all framed as optimisations over the per-edge rate vector $r \in \mathbb{R}_+^M$. Each one is appropriate in a specific region of $\theta$-space; picking the wrong solver for a given prior is the primary failure mode beyond true non-identifiability.
+      </p>
+
+      <div class="box definition"><span class="label">Per-edge NNLS.</span>
+        \[ \widehat r \;=\; \operatorname*{arg\,min}_{r \geq 0} \; \bigl\lVert A\, r - y \bigr\rVert_2^2. \]
+        Lawson–Hanson active-set solver. Appropriate when the prior yields an identifiable per-edge system (Predetermined on a tree). In underdetermined cases it returns a sparse vertex of the feasible polytope; that sparsity is an <em>algorithmic</em> artefact, not a principled prior.
+      </div>
+
+      <div class="box definition"><span class="label">Pooled NNLS.</span>
+        Columns of $A$ corresponding to edges of the same junction are summed, reducing the unknown from $M$ per-edge rates to $K_{\mathrm{junc}}$ junction rates:
+        \[ \widetilde A_{\cdot, j} \;=\; \sum_{k:\, j(k) = j} A_{\cdot, k}, \qquad \widehat\rho \;=\; \operatorname*{arg\,min}_{\rho \geq 0} \; \lVert \widetilde A\, \rho - y \rVert_2^2, \qquad \widehat r_k \;=\; \widehat\rho_{j(k)}. \]
+        Appropriate when the prior is Pure kinetic (exact). Otherwise imposes an incorrect junction-pooling assumption on per-edge truth.
+      </div>
+
+      <div class="box definition"><span class="label">Junction-shrinkage NNLS (structural, $\lambda$-tunable).</span>
+        Soft junction-pooling. Penalises within-junction rate variance, but doesn't force edges of the same junction to share a rate:
+        \[ \widehat r \;=\; \operatorname*{arg\,min}_{r \geq 0} \; \bigl\lVert A\, r - y \bigr\rVert_2^2 \,+\, \lambda \sum_{j = 1}^{K_{\mathrm{junc}}} \sum_{k:\, j(k) = j} \bigl(r_k - \rho_j(r)\bigr)^2, \qquad \rho_j(r) \;=\; \frac{1}{n_j}\sum_{k:\, j(k) = j} r_k. \]
+        <p style="margin-top:8px"><b>What the penalty does.</b> For each junction $j$, it pulls the rates of the edges that use $j$ toward their own average. $\lambda = 0$ is per-edge NNLS (no pulling); $\lambda \to \infty$ forces all edges of a junction to be equal (pooled NNLS). Intermediate $\lambda$ is a principled interpolation that encodes the biology directly: "the same splice site tends to have similar kinetics, but the exact rate can vary by context."</p>
+        <p><b>Why the Lawson–Hanson sparsity artefact disappears.</b> Vanilla per-edge NNLS is underdetermined whenever $M > N - 1$ (which is every interesting case). The feasible set $\{r \geq 0 : A\, r = y\}$ is a high-dimensional polytope with many solutions. Lawson–Hanson's active-set algorithm picks a <em>vertex</em> of that polytope — the sparsest feasible $r$. That vertex is algorithm-dependent and has no Bayesian meaning.</p>
+        <p>Junction-shrinkage adds $(n_j - 1)$ Helmert rows per junction to the NNLS system, scaled by $\sqrt{\lambda}$. The Helmert rows encode the within-junction variance penalty in a way NNLS can solve. The augmented system has</p>
+        \[ N_{\mathrm{aug}} \;=\; (N - 1) \,+\, \sum_{j} (n_j - 1) \;=\; (N - 1) \,+\, (M - K_{\mathrm{junc}}) \]
+        <p>rows against $M$ columns. For any realistic gene $N > K_{\mathrm{junc}}$, so $N_{\mathrm{aug}} > M$ — the augmented system is <em>overdetermined</em>. NNLS returns the unique least-squares solution; no vertex-picking, no algorithmic sparsity. That's the airtight part.</p>
+        <p><b>Geometric picture.</b> Among all $r$ in the feasible polytope, $\lambda \to 0^+$ selects the unique one with the smallest within-junction variance — the polytope point closest to the "pooled subspace" $\{r_k = \rho_{j(k)} \text{ for all } k\}$. This is a principled point to pick because, under the Mixed-Dirichlet prior, most of the prior mass lives near the pooled subspace (rates on edges sharing junction $j$ are related by a shared $\rho_j$ factor). Junction-shrinkage picks the best-fitting rate vector that's closest to this high-prior-mass region.</p>
+        <p>See <a href="#about-example">§13</a> below for a concrete worked example on DADADA.</p>
+      </div>
+
+      <div class="box definition"><span class="label">Ridge NNLS ($L_2$ toward 0).</span>
+        \[ \widehat r \;=\; \operatorname*{arg\,min}_{r \geq 0} \; \bigl\lVert A\, r - y \bigr\rVert_2^2 \,+\, \lambda \cdot \lVert r \rVert_2^2. \]
+        Solved equivalently as NNLS on the augmented system $\bigl[A;\, \sqrt{\lambda}\, I\bigr]\, r = \bigl[y;\, 0\bigr]$. Shrinks all rates smoothly toward zero; no arbitrary zeros. Appropriate when you want a unique non-sparse answer and are willing to accept biased-toward-zero estimates.
+      </div>
+
+      <div class="box definition"><span class="label">LASSO NNLS ($L_1$ penalty).</span>
+        Because $r \geq 0$, $\lVert r \rVert_1 = \mathbf{1}^\top r$:
+        \[ \widehat r \;=\; \operatorname*{arg\,min}_{r \geq 0} \; \bigl\lVert A\, r - y \bigr\rVert_2^2 \,+\, \lambda \cdot \mathbf{1}^\top r. \]
+        Coordinate-descent solver. The sparsity is explicit and tuned by $\lambda$. Appropriate when biology justifies sparse rate structure (e.g., most edges negligible) and you want that assumption visible to the reader of the paper.
+      </div>
+
+      <div class="box definition"><span class="label">Smooth NNLS ($L_2$ toward $R_0$).</span>
+        Tikhonov regularisation pulling rates toward a biological reference $R_0$:
+        \[ \widehat r \;=\; \operatorname*{arg\,min}_{r \geq 0} \; \bigl\lVert A\, r - y \bigr\rVert_2^2 \,+\, \lambda \cdot \lVert r - R_0 \cdot \mathbf{1} \rVert_2^2. \]
+        Solved as NNLS on $\bigl[A;\, \sqrt{\lambda}\, I\bigr]\, r = \bigl[y;\, \sqrt{\lambda}\, R_0\, \mathbf{1}\bigr]$. Appropriate when rates are a priori expected near a typical value (log-normal mode) rather than near zero. Shrinks toward $R_0$ as $\lambda$ increases.
+      </div>
+
+      <p>
+        Under the <a href="#about-srv">SRV framework</a>, each solver is optimal in a sub-region of $\theta$-space, and the goal is to map those sub-regions explicitly. The <a href="#about-generator">identifiability table</a> at the end of §8 is a first draft of that map.
+      </p>
+
+      <h4>Per-edge identifiability score</h4>
+      <p>
+        For each edge $k$ included in the solve, a scaled diagonal of the pseudoinverse gives a continuous identifiability score:
+      </p>
+      <p>$$ M \;=\; A^\top A + \varepsilon\, I \quad (\varepsilon \approx 10^{-6} \cdot M_{00}), \qquad \mathrm{score}_k \;=\; \frac{1}{M^{-1}_{kk} \cdot \lVert a_k \rVert_2^2} \;\in\; [0, 1]. $$</p>
+      <p>
+        A column whose direction is redundant with other columns has a large $M^{-1}_{kk}$, driving the score toward zero — red edges when <b>Color transitions by how well they're determined</b> is on. Green edges are uniquely pinned.
+      </p>
+
+      <h4>Conditioning</h4>
+      <ul>
+        <li><b>$\mathrm{rank}(A)$:</b> the number of linearly independent columns. If $\mathrm{rank} < n_{\mathrm{cols}}$, there are <em>missing constraints</em> (positive Nullity in the diagnostics bar) and per-edge NNLS returns one min-norm non-negative feasible point rather than the unique truth.</li>
+        <li><b>Condition number</b> $\kappa(A) = \sigma_{\max}/\sigma_{\min}$ (estimated by power iteration on $A^\top A$). Shown as $\log_{10}\kappa$. Values above $\sim 6$ are noise-sensitive even when nominally full-rank — the numerical ceiling at high $K$.</li>
+      </ul>
+
+      <h3 id="about-r2">11. R², residual, and what "rates recovered" means</h3>
+      <p>
+        Given the true rate vector $r^*$ and the recovered $\widehat r$, we report two very different $R^2$ numbers.
+      </p>
+      <h4>Masked R² (the diagnostics bar and right scatter)</h4>
+      <p>Restricted to edges that are observable <em>and</em> whose true rate is above trace level:</p>
+      <p>$$ \tau_{\mathrm{trace}} \;=\; \max\bigl(10^{-6},\ \textstyle\max_k r^*_k \cdot 10^{-3}\bigr), \qquad \mathrm{mask}_k \;=\; \mathrm{obs}[k] \,\land\, (r^*_k > \tau_{\mathrm{trace}}), $$</p>
+      <p>$$ R^2_{\mathrm{mask}} \;=\; 1 \,-\, \frac{\sum_k (\widehat r_k - r^*_k)^2}{\sum_k (r^*_k - \overline{r^*})^2} \quad \text{over masked } k. $$</p>
+      <p>This answers: <em>of the rates we can actually see, how well do we recover them?</em> When the system is full-rank and well-conditioned, $R^2_{\mathrm{mask}} \to 1$.</p>
+      <h4>All-edges R² (left scatter)</h4>
+      <p>
+        Over <em>every</em> edge in the topology, including unobservable ones. Unobservable edges typically get pegged to 0 by NNLS (no data, no basis to set them), so if the true rate happened to be non-zero this number drops. The gap between the two $R^2$ values is the size of the "invisible" rate mass.
+      </p>
+      <h4>Residual</h4>
+      <p>$$ \mathrm{residual} \;=\; \lVert A\, \widehat r - c \rVert_2. $$</p>
+      <p>
+        Under matched export and enough constraints, NNLS drives this to machine precision. A large residual with low $R^2$ tells you the solver can't even fit the observations — likely a model-mismatch scenario.
+      </p>
+
+      <h3 id="about-reading">12. Reading the visualisation</h3>
+      <h4>The DAG</h4>
+      <ul>
+        <li>Nodes are isoform states, laid out by layer (vertical) and label (horizontal). Node size and colour encode $p_i$.</li>
+        <li>Edges are splicing transitions, width $\propto$ true rate. Turn on <b>Overlay recovered rates (dashed)</b> to compare to $\widehat r$.</li>
+        <li><b>Color transitions by how well they're determined</b> repaints edges with the identifiability score.</li>
+        <li><b>Show all nodes &amp; edges</b> reveals every edge in the DADA skeleton regardless of activity — useful for hand-editing zero-rate edges. By default only active, observable edges render.</li>
+        <li>Click any edge or any True-rate cell in the table to edit that rate by hand.</li>
+      </ul>
+      <h4>Sashimi panel</h4>
+      <p>Hover a node to draw its splice pattern as arcs over the D/A track — the shape of the mature mRNA for that state.</p>
+      <h4>Scatter plots</h4>
+      <ul>
+        <li><b>All edges</b> (left): true vs recovered over every edge. $R^2$ is computed on every point plotted.</li>
+        <li><b>Observable edges only</b> (right): the same scatter restricted to the observable mask. Its $R^2$ is what you see in the diagnostics bar.</li>
+      </ul>
+      <h4>Diagnostics bar</h4>
+      <p>
+        Data equations $=$ number of observable balance rows. Rates to recover $=$ number of usable columns. Independent constraints $=$ rank. Missing constraints $=$ cols $-$ rank. Noise sensitivity $= \log_{10}\kappa$. Unspliced fraction $= p_0$.
+      </p>
+
+      <h3 id="about-example">13. Worked example — the four solvers on a Mixed DADADA</h3>
+      <p>
+        The best way to see what junction-shrinkage actually does is to watch all four solvers recover the same rate vector. The panel below runs on a fixed DADADA gene at the Mixed preset ($\eta = 0.5$, $\sigma = 1$, $\alpha = 1$, seed = 2026), generates the ground-truth rates, forward-computes the IPD, then inverts with per-edge, pooled, junction-shrinkage, and junction-shrinkage-at-large-$\lambda$.
+      </p>
+      <p>
+        Each horizontal bar below is one edge; edges are grouped and colour-coded by their junction. The top row is the ground truth. The next three rows are the solver recoveries. Move the $\lambda$ slider to see junction-shrinkage interpolate between per-edge and pooled.
+      </p>
+
+      <div class="example-demo" id="jshrink-demo" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:16px;margin:16px 0">
+        <div style="display:flex;gap:20px;align-items:center;margin-bottom:10px">
+          <div style="font-family:'Fira Code', monospace;font-size:13px;color:var(--accent)">Junction-shrinkage λ</div>
+          <input id="jshrink-lambda" type="range" min="-6" max="4" step="0.1" value="-4" style="flex:1;accent-color:var(--accent)">
+          <div style="font-family:'Fira Code', monospace;font-size:12px;color:var(--accent2);font-weight:700;min-width:100px;text-align:right" id="jshrink-lambda-val">λ = 1e-4</div>
+        </div>
+        <svg id="jshrink-chart" width="820" height="240" style="display:block;max-width:100%;background:var(--panel2);border-radius:4px"></svg>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted2);margin-top:8px" id="jshrink-r2-row"></div>
+      </div>
+
+      <p>
+        <b>What to notice.</b> Per-edge NNLS leaves some edges at zero — the Lawson–Hanson vertex it picks is the sparsest feasible solution, so edges that are actually active get driven to zero to keep the cardinality low. Pooled NNLS flattens every edge of a junction to the same height: it can't represent the within-junction variation the truth actually has. Junction-shrinkage at small $\lambda$ keeps the edges near their junction's average but lets them vary — it's the closest to truth of the three solvers. Crank $\lambda$ up and it converges on pooled; drag it to the bottom and it starts looking like per-edge.
+      </p>
+
+      <p>
+        <b>What the $R^2$ numbers mean.</b> $R^2$ over the observable edges, relative to the ground truth. A solver that recovers every edge exactly has $R^2 = 1$; one that does worse than the mean has $R^2 < 0$. In the Mixed regime, per-edge NNLS is typically below zero (Lawson–Hanson's vertex pick is worse than just guessing the mean); junction-shrinkage at small $\lambda$ is the best of all four because it's the principled polytope-point closest to the pooled subspace.
+      </p>
+
+      <p>
+        <b>Why this beats just trusting pooled.</b> Pooled NNLS throws away the within-junction variation that the truth actually has. Junction-shrinkage preserves it — at $\lambda \to 0^+$, the recovered rates still differ across edges of the same junction, just not by as much as an unregularised per-edge NNLS would let them. That's the "soft" in soft-pooling: encode the structural prior without erasing the data's own word.
+      </p>
+
+      <h3 id="about-subgraph-posterior">14. Posterior over active subgraphs — the principled view</h3>
+
+      <p>
+        IHT (§10) returns a single active subgraph $\widehat S$ as a point estimate. The proper Bayesian object is the <em>posterior distribution</em> $p(S \mid y, \theta)$ — a probability assigned to every active subgraph in light of the observed IPD. This section explains what that distribution looks like, how to compute it, and why it forces a clean conclusion: <b>a single noiseless IPD does not identify the active subgraph</b>, no matter what algorithm you bring.
+      </p>
+
+      <h4>The Bayesian formulation</h4>
+      <p>By Bayes' rule, the posterior factors as</p>
+      <p>$$ p(S \mid y, \theta) \;\propto\; p(y \mid S, \theta) \cdot p(S \mid \theta). $$</p>
+
+      <p><b>The prior $p(S \mid \theta)$.</b> Under the Mixed-Dirichlet generator, the active set is independent across child states: each child $c$ with $m_c$ parents picks $k_c = \max(1, \mathrm{round}(\eta \cdot m_c))$ of them uniformly at random. So the prior factors per child:</p>
+      <p>$$ p(S \mid \theta) \;=\; \prod_c \frac{1}{\binom{m_c}{k_c}} \cdot \mathbb{1}\bigl[\, |S \cap \mathrm{in}(c)| = k_c \,\bigr]. $$</p>
+      <p>Subgraphs that respect the η-cardinality have equal prior probability; subgraphs that violate it have zero prior. No tree assumption: at $\eta > 0$ children with multiple active parents (diamonds) are explicitly allowed.</p>
+
+      <p><b>The likelihood $p(y \mid S, \theta)$.</b> This is the marginal likelihood of $y$ averaged over rate vectors supported on $S$:</p>
+      <p>$$ p(y \mid S, \theta) \;=\; \int p(y \mid r) \cdot \pi(r \mid S, \sigma, \alpha) \, dr. $$</p>
+      <p>Without observation noise, $p(y \mid r) = \delta\bigl(y - f(r)\bigr)$, which is a singular density. We approximate it by a soft-Dirac matched to the residual scale: among rate vectors supported on $S$, find the NNLS-best fit to the steady-state balance system, and score $S$ by</p>
+      <p>$$ p(y \mid S, \theta) \;\approx\; \exp\!\Bigl(\,-\, \bigl\lVert A_S\, \widehat r_S - c \bigr\rVert_2^2 \,/\, h^2 \,\Bigr) $$</p>
+      <p>where $A_S$ is the balance matrix restricted to columns in $S$, $c_i = \lambda_i\, p_i$ is the export-weighted RHS, $\widehat r_S = \mathrm{NNLS}(A_S, c)$, and $h$ is a small bandwidth (we use $10^{-3}$). Subgraphs whose best NNLS fit produces a residual at floating-point noise level dominate the posterior; subgraphs with a meaningful residual contribute essentially nothing.</p>
+
+      <h4>Algorithm</h4>
+      <ol>
+        <li>Enumerate every subgraph $S$ satisfying the η-cardinality (factored per child via Cartesian product over $\binom{m_c}{k_c}$ choices).</li>
+        <li>For each $S$: build $A_S$, solve $\widehat r_S = \mathrm{NNLS}(A_S, c)$, record the residual $\lVert A_S \widehat r_S - c \rVert_2$.</li>
+        <li>Convert residuals to soft-Dirac evidences and normalise to obtain $p(S \mid y, \theta)$.</li>
+        <li>Marginalise to get edge-inclusion probabilities $\;P(\text{edge } k \in S \mid y, \theta) = \sum_{S \ni k} p(S \mid y, \theta)$.</li>
+      </ol>
+      <p>Brute-force enumeration is fine for DADADA (≤ 100 subgraphs) and DADADADA at low η (~10² – 10³); larger graphs would need importance sampling or MCMC.</p>
+
+      <h4>The empirical result</h4>
+
+      <p>Run on DADADA at the three preset points (seed 42, noiseless):</p>
+
+      <table class="mathtable">
+        <tr>
+          <th>preset</th>
+          <th>η</th>
+          <th># subgraphs<br>(η-consistent)</th>
+          <th>residual range</th>
+          <th>posterior shape</th>
+          <th>true rank</th>
+        </tr>
+        <tr><td>Predetermined</td><td>0</td><td>96 trees</td>            <td>$10^{-17}$ everywhere</td><td>uniform</td><td>78 / 96</td></tr>
+        <tr><td>Mixed</td>         <td>0.5</td><td>96 (13-edge)</td>     <td>$10^{-17}$ everywhere</td><td>uniform</td><td>78 / 96</td></tr>
+        <tr><td>Kinetic</td>       <td>1</td><td>1 (full graph)</td>     <td>$10^{-17}$</td>          <td>$\delta$</td><td>1 / 1</td></tr>
+      </table>
+
+      <p>
+        At Predetermined: 96 distinct trees are <em>all</em> consistent with the same noiseless IPD, each fitting it to floating-point precision. The posterior is uniform over the 96. The true tree is rank 78 of 96 — i.e., indistinguishable from the other 95.
+      </p>
+      <p>
+        At Mixed: same. Each of the 96 cardinality-13 subgraphs (one per Cartesian-product choice across 3-parent and 2-parent children) fits exactly. Posterior uniform.
+      </p>
+      <p>
+        At Kinetic: only one subgraph satisfies the cardinality (every edge active), so the posterior is a delta on the truth — trivially.
+      </p>
+
+      <h4>Why this is the right answer (and not a bug)</h4>
+
+      <p>For each cardinality-consistent subgraph $S$, the balance system $A_S\, r = c$ has a non-empty feasible set $\{r \geq 0 : A_S\, r = c\}$ — and NNLS finds the unique vertex of the minimum cardinality. Whether this set is a single point or a polytope depends on $|S|$ vs. the rank of $A_S$, but as long as some non-negative $r$ produces $A_S\, r = c$, the residual is zero.</p>
+
+      <p>For all 96 cardinality-13 subgraphs of DADADA, this is the case: the system has 12 balance rows and 13 columns, but the truth's $f(r)$ uniquely determines $c$, and many $r$-vectors supported on different $S$ produce the same $c$. The forward map $r \mapsto p$ has a non-trivial kernel relative to "rate vectors supported on different cardinality-13 subgraphs."</p>
+
+      <p>
+        Geometrically: each cardinality-13 subgraph defines a 13-dimensional polytope in $r$-space; the constraint $A_S\, r = c$ slices out an affine sub-polytope; the intersection with $\mathbb{R}_+^{13}$ is non-empty for many $S$. <b>The data identifies the union of these slices, not the specific one.</b>
+      </p>
+
+      <h4>Edge-inclusion marginals: cardinality survives, identity doesn't</h4>
+
+      <p>While the joint posterior is uniform, marginalising over $S$ gives non-trivial edge probabilities. On DADADA Mixed:</p>
+
+      <table class="mathtable">
+        <tr><th>edge group</th><th>m_c</th><th>k_c</th><th>P(edge ∈ S | y, θ)</th></tr>
+        <tr><td>Layer-1 (from null)</td>            <td>1</td><td>1</td><td>1.000</td></tr>
+        <tr><td>Layer-2 (2-parent children)</td>    <td>2</td><td>1</td><td>0.500</td></tr>
+        <tr><td>Layer-3 (3-parent diamond → s_max)</td><td>3</td><td>2</td><td>0.667</td></tr>
+      </table>
+
+      <p>
+        The marginal at every edge is exactly $k_c / m_c$. <b>The data gives back the cardinality structure of the prior — and nothing more.</b> Specific edge identities are pure 50/50 (or 1/3, etc.) coin-flips from the data's perspective. This is an honest visualisation of the identifiability ceiling: <em>cardinality is identified; identity is not</em>.
+      </p>
+
+      <h4>What this says about IHT</h4>
+
+      <p>
+        IHT (§10 mode "θ-aware") returns a single subgraph from the cardinality-consistent set. From the posterior's perspective, IHT's output is one of the 96 equally-correct candidates — equivalent to flipping fair coins at every choice point. The recovered R² of $\approx 0.4$ on Predetermined isn't IHT failing; it's the <em>average</em> R² over uniformly-distributed wrong-edge picks across the cardinality class. Two IHT runs from different initialisations would land on different subgraphs, both producing the exact same IPD if you forward-simulated them.
+      </p>
+      <p>
+        IHT is therefore a <em>perfectly fine point estimator</em> in this regime — but it's reporting one draw from a uniform distribution as if it were the answer. The principled object is the distribution itself.
+      </p>
+
+      <h4>What breaks the degeneracy</h4>
+
+      <ol>
+        <li><b>Observation noise.</b> A Dirichlet-$\kappa$ likelihood gives differentiable evidence for each $S$. The best-fit residual is no longer zero; subgraphs differ in how naturally their fitted rates fall under the prior $\pi(r \mid S, \sigma, \alpha)$. The posterior concentrates somewhat. Effect size depends on $\kappa$.</li>
+        <li><b>Multiple observations.</b> If the same gene is observed under different conditions (perturbations, time-points, mutants) sharing the same active subgraph but different rates, the joint likelihood $\prod_t p(y_t \mid S, \theta_t)$ rapidly prunes $S$. Each new IPD is a new constraint on $S$.</li>
+        <li><b>Stronger structural prior.</b> If the prior over $S$ isn't uniform within the cardinality class — e.g., if specific junctions are biologically known to be rarely used — the prior alone breaks ties.</li>
+        <li><b>Time-resolved data.</b> Pre-steady-state IPDs (nascent RNA at multiple time-points) carry kinetic information beyond the steady-state, fully constraining individual rates.</li>
+      </ol>
+
+      <p>
+        Without one of these, single-IPD inference of $S$ is <em>fundamentally</em> degenerate — not because our solvers are weak, but because the inverse problem doesn't contain that information.
+      </p>
+
+      <h4>Take-aways</h4>
+
+      <ol>
+        <li>Single noiseless IPD &rarr; cardinality of the active subgraph is recoverable; specific edge identity is not. <em>Math fact, not an algorithmic limitation.</em></li>
+        <li>The marginal edge-inclusion probabilities expose this exactly: they reproduce the prior cardinalities $k_c / m_c$ per child.</li>
+        <li>IHT is the right point estimator under the cardinality constraint, but its accuracy is bounded above by what the marginal posterior allows — fundamentally less than 1.0 in non-Kinetic regimes.</li>
+        <li>To do better, the experimental design must change: observation noise breaks the tie weakly, multiple IPDs break it strongly, time-course data breaks it almost entirely.</li>
+      </ol>
+
+      <h3 id="about-assumptions">Assumptions in one place</h3>
+      <ol>
+        <li><b>Steady state.</b> Transcription, splicing, and export have all reached equilibrium. The solver inverts an algebraic system, not a dynamical one.</li>
+        <li><b>Deterministic abundances.</b> IPDs are taken as exact — no measurement noise in the forward run. (You can explore noise sensitivity via the condition number and by hand-perturbing rates.)</li>
+        <li><b>No nested junctions.</b> Alternative splicing patterns are limited to strictly sequential junctions along the transcript.</li>
+        <li><b>Known export kinetics.</b> The solver is told the profile and $\mathrm{nullFrac}$. Real inverse problems have to estimate these or absorb them into the rates.</li>
+        <li><b>Scale-invariance.</b> Only the ratio $r / \lambda$ matters for IPDs, and $\lambda_{\mathrm{base}} = 1$ fixes the scale. Doubling every rate and $\lambda_{\mathrm{base}}$ leaves the IPD unchanged.</li>
+        <li><b>No back-splicing.</b> Edges go from fewer-junction states to more-junction states only. Splicing is irreversible in this model.</li>
+        <li><b>First-order kinetics.</b> All splicing and export reactions are single-step, mass-action rate processes. No cooperativity, no second-order dependences on other species.</li>
+      </ol>
+
+      <p style="color:var(--muted);margin-top:18px;font-size:11px;font-style:italic">
+        Source: see the <code>generateRates</code>, <code>forwardPredict</code>, <code>solveRates</code>, and <code>r2Score</code> functions in this file for the ground truth on every formula above.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════════════
+const INTRON_COLORS = ['#c9bfa8','#1f4e79','#2d7a4b','#b08100','#c56c2c','#c73e5a','#7a3fd6','#a8475e'];
+const NULL_COLOR    = '#6b5d8a';
+const PRODUCTION    = 1.0;
+// Splicing rates are generated with this scale. lambda (export base) is pinned at 1.0,
+// so rates are in units of lambda. Order-of-magnitude rates >> 1 => null state is rare.
+const RATE_SCALE    = 75;
+
+// Export rate as a function of splice completion c = layer(i) / max_layer in [0,1].
+// nullFrac = E(c=0) / E(c=1). profile = shape of f(c) with f(0)=nullFrac, f(1)=1.
+function exportShapeValue(c, profile, nullFrac) {
+  let f;
+  switch (profile) {
+    case 'linear':  f = nullFrac + (1 - nullFrac) * c; break;
+    case 'power':   f = nullFrac + (1 - nullFrac) * c * c; break;
+    case 'exp': {
+      const k = 3;
+      f = nullFrac + (1 - nullFrac) * (Math.exp(k * c) - 1) / (Math.exp(k) - 1);
+      break;
+    }
+    case 'sigmoid': {
+      const k = 8;
+      const s0 = 1 / (1 + Math.exp(k * 0.5));
+      const s1 = 1 / (1 + Math.exp(-k * 0.5));
+      f = nullFrac + (1 - nullFrac) * (1 / (1 + Math.exp(-k * (c - 0.5))) - s0) / (s1 - s0);
+      break;
+    }
+    case 'constant':
+    default: f = 1;
+  }
+  return f;
+}
+
+function computeExportArray(topology, base, profile, nullFrac) {
+  const { nStates, layers } = topology;
+  const maxL = Math.max(1, ...layers);
+  const arr = new Array(nStates);
+  for (let i = 0; i < nStates; i++) {
+    const c = maxL > 0 ? layers[i] / maxL : 0;
+    arr[i] = base * exportShapeValue(c, profile, nullFrac);
+  }
+  return arr;
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOPOLOGY BUILDER — any DADA string
+// ══════════════════════════════════════════════════════════════
+
+function parseDADA(s) {
+  const sites = [];
+  for (const c of (s || '').toUpperCase()) {
+    if (c === 'D' || c === 'A') sites.push(c);
+  }
+  return sites;
+}
+
+function junctionsCompatible(j1, j2) {
+  // Half-open intervals [d, a) must be disjoint; shared donor/acceptor also disallowed
+  if (j1[0] === j2[0] || j1[1] === j2[1]) return false;
+  return j1[1] <= j2[0] || j2[1] <= j1[0];
+}
+
+function junctionKey(j) { return '(' + j[0] + ',' + j[1] + ')'; }
+
+function buildTopology(dadaString) {
+  const sites = parseDADA(dadaString);
+  const nSites = sites.length;
+
+  // Weighted genomic positions: DD/AA transitions get eps (alt splice sites),
+  // DA/AD transitions get 1.0 (intron/exon boundary).
+  const EPS_ALT = 0.05;
+  const wPos = [0];
+  for (let i = 1; i < nSites; i++) {
+    wPos.push(wPos[i - 1] + (sites[i] === sites[i - 1] ? EPS_ALT : 1.0));
+  }
+
+  // Enumerate all valid D→A junctions
+  const junctions = [];
+  for (let i = 0; i < nSites; i++) {
+    if (sites[i] !== 'D') continue;
+    for (let j = i + 1; j < nSites; j++) {
+      if (sites[j] !== 'A') continue;
+      junctions.push([i, j]);
+    }
+  }
+
+  // Junction weighted midpoints (used by rate generator for proximity)
+  const juncMid = junctions.map(j => (wPos[j[0]] + wPos[j[1]]) / 2);
+
+  // BFS enumerate reachable states. Each state = Set of junction indices.
+  const stateKey = (idxSet) => [...idxSet].sort((a,b) => a-b).join(',');
+  const empty = new Set();
+  const states = [empty];
+  const keyToIdx = new Map();
+  keyToIdx.set(stateKey(empty), 0);
+  const queue = [0];
+  const edges = [];
+  const MAX_STATES = 400;
+
+  let truncated = false;
+  while (queue.length > 0) {
+    const si = queue.shift();
+    const state = states[si];
+    for (let ji = 0; ji < junctions.length; ji++) {
+      if (state.has(ji)) continue;
+      let ok = true;
+      for (const existing of state) {
+        if (!junctionsCompatible(junctions[existing], junctions[ji])) { ok = false; break; }
+      }
+      if (!ok) continue;
+      const newState = new Set(state);
+      newState.add(ji);
+      const nkey = stateKey(newState);
+      let di;
+      if (keyToIdx.has(nkey)) {
+        di = keyToIdx.get(nkey);
+      } else {
+        if (states.length >= MAX_STATES) { truncated = true; continue; }
+        di = states.length;
+        states.push(newState);
+        keyToIdx.set(nkey, di);
+        queue.push(di);
+      }
+      edges.push({
+        src: si, dst: di,
+        juncIdx: ji,
+        junc: junctions[ji],
+        juncKey: junctionKey(junctions[ji])
+      });
+    }
+  }
+
+  // Assign an edge index
+  edges.forEach((e, i) => e.idx = i);
+
+  const layers = states.map(s => s.size);
+
+  const labels = states.map(s => {
+    if (s.size === 0) return 'null';
+    const arr = [...s].sort((a,b) => junctions[a][0] - junctions[b][0])
+      .map(ji => '(' + junctions[ji][0] + ',' + junctions[ji][1] + ')');
+    return '{' + arr.join(',') + '}';
+  });
+
+  // sashimi[i] = list of junctions for state i as [d,a] pairs
+  const sashimi = states.map(s =>
+    [...s].sort((a,b) => junctions[a][0] - junctions[b][0]).map(ji => junctions[ji].slice())
+  );
+
+  return {
+    sites, nSites, wPos,
+    junctions, nJunctions: junctions.length, juncMid,
+    states: states.map(s => [...s]),
+    nStates: states.length,
+    edges,
+    nEdges: edges.length,
+    layers, labels, sashimi,
+    truncated
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// RATE GENERATORS — one per prior regime
+// ══════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════
+// SEEDED RNG (mulberry32) — all stochasticity flows through rng()
+// ══════════════════════════════════════════════════════════════
+// Separate the generative seed (used by generators, observation noise,
+// numerical matCond power iteration, etc.) from the default Math.random.
+// setSeed(n) reinitialises the PRNG; every Randomize re-seeds before
+// drawing so the run is reproducible.
+let _rngState = 42 >>> 0;
+function setSeed(s) { _rngState = (s >>> 0) || 1; }
+function rng() {
+  _rngState = (_rngState + 0x6D2B79F5) >>> 0;
+  let t = _rngState;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+// Box-Muller standard normal, using the seeded rng.
+function normalRandom() {
+  let u, v, s;
+  do { u = rng() * 2 - 1; v = rng() * 2 - 1; s = u*u + v*v; }
+  while (s >= 1 || s === 0);
+  return u * Math.sqrt(-2 * Math.log(s) / s);
+}
+
+// Marsaglia–Tsang sampler for Gamma(shape, 1).
+function gammaRandom(shape) {
+  if (shape < 1) return gammaRandom(shape + 1) * Math.pow(rng() || 1e-12, 1 / shape);
+  const d = shape - 1 / 3;
+  const c = 1 / Math.sqrt(9 * d);
+  while (true) {
+    let x, v;
+    do { x = normalRandom(); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v;
+    const u = rng();
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+
+// Dirichlet-κ observation noise on IPD: y ~ Dir(κ · p).
+// κ = 0 (or very small) returns p unchanged (noiseless).
+function applyObservationNoise(p, kappa) {
+  if (!kappa || kappa < 1e-6) return p.slice();
+  const g = p.map(pi => gammaRandom(Math.max(1e-6, kappa * pi)));
+  let total = 0;
+  for (const v of g) total += v;
+  if (total <= 0) return p.slice();
+  return g.map(v => v / total);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Rate generators — one per prior regime.
+// ══════════════════════════════════════════════════════════════
+//
+//   Null prior            full graph,  per-edge rates  (every edge independent)
+//   Pure kinetic          full graph,  pooled  rates   (one rate per junction)
+//   Purely predetermined  single path, per-edge rates  (random total-order walk)
+//   Mixed                 full graph,  partitioned     (some junctions pooled, others per-edge)
+//
+// Each generator returns { rates: number[nEdges], activeMask: boolean[nEdges] | null }.
+// activeMask=null means "all edges active" (for visualization and NNLS column
+// selection); otherwise only the masked-true edges carry flux and are fed to
+// the solver.
+
+// One generator — Mixed-Dirichlet(η, σ, α). The Predetermined / Mixed /
+// Kinetic toggle in the UI just dials the slider values to canonical points
+// in (η, α)-space; it is not a separate generator.
+function generateRates(topology, params) {
+  const pp = (typeof params === 'object') ? params : {};
+  return generateRatesMixedDirichlet(topology, pp);
+}
+
+// ── Mixed (Dirichlet, two-parameter: η structure + α concentration) ──
+// Two orthogonal knobs. η ∈ [0, 1] controls how many parents per child are
+// active; α ∈ ℝ₊ controls how the Dirichlet concentrates weights among those
+// active parents. η and α are completely independent: η reshapes the prior's
+// support (which subgraph is active), α reshapes the weight distribution on
+// the support.
+//
+// Algorithm, per child state c with m parents:
+//   1. k = max(1, round(η · m)) — the number of active parents.
+//   2. Draw an active-set: uniform random subset of size k from the m parents.
+//   3. Draw w ~ Dirichlet(α, …, α) over the k active parents via normalised
+//      Gamma(α) variates.
+//   4. Assign rate(p_i → c) = ρ_{j(i)} · k · w_i for each active parent,
+//      rate 0 for inactive.
+//
+// Corners of the (η, α) plane:
+//   η = 0                : strict tree (k = 1, one parent carries flux).
+//   η = 1, α → ∞         : kinetic limit (all parents, equal weights 1/m).
+//   η = 1, α → 0         : full graph topologically, but one parent dominates
+//                          per child — stochastic kinetic with winner-take-all.
+//   η = 0.5, α = 1       : half the parents active per child, uniform on the
+//                          simplex over the active set.
+function generateRatesMixedDirichlet(topology, params) {
+  const { edges, nEdges, nStates, nJunctions } = topology;
+  const eta = Math.max(0, Math.min(1, params.sparsity != null ? params.sparsity : 0.5));
+  const alpha = Math.max(1e-3, params.alpha != null ? params.alpha : 1.0);
+  const spr = Math.max(0, params.spread != null ? params.spread : 1);
+
+  const incoming = new Array(nStates);
+  for (let i = 0; i < nStates; i++) incoming[i] = [];
+  for (let k = 0; k < nEdges; k++) incoming[edges[k].dst].push(k);
+
+  const juncAmp = new Array(nJunctions);
+  for (let j = 0; j < nJunctions; j++) {
+    juncAmp[j] = (spr < 0.01)
+      ? RATE_SCALE
+      : Math.max(0.001, RATE_SCALE * Math.exp(spr * normalRandom()));
+  }
+
+  const rates = new Array(nEdges).fill(0);
+  for (let i = 1; i < nStates; i++) {
+    const inc = incoming[i];
+    const m = inc.length;
+    if (m === 0) continue;
+    const k = Math.max(1, Math.min(m, Math.round(eta * m)));
+    // Uniform random subset of size k — Fisher-Yates partial shuffle.
+    const idx = inc.map((_, r) => r);
+    for (let j = 0; j < k; j++) {
+      const pick = j + Math.floor(rng() * (idx.length - j));
+      const tmp = idx[j]; idx[j] = idx[pick]; idx[pick] = tmp;
+    }
+    const keep = idx.slice(0, k);
+    // Dirichlet(α, …, α) weights on the active subset via normalised Gammas.
+    const g = keep.map(() => gammaRandom(alpha));
+    let total = 0;
+    for (const v of g) total += v;
+    if (total <= 0) total = 1;
+    for (let j = 0; j < keep.length; j++) {
+      const r = keep[j];
+      const ek = inc[r];
+      const w = g[j] / total;
+      rates[ek] = juncAmp[edges[ek].juncIdx] * (k * w);
+    }
+  }
+  const activeMask = rates.map(r => r > 0);
+  return { rates, activeMask };
+}
+
+// ══════════════════════════════════════════════════════════════
+// LINEAR ALGEBRA
+// ══════════════════════════════════════════════════════════════
+
+function gaussSolve(A, b) {
+  const n = A.length;
+  const M = A.map((row, i) => row.concat([b[i]]));
+  for (let col = 0; col < n; col++) {
+    let maxVal = Math.abs(M[col][col]), maxRow = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(M[row][col]) > maxVal) { maxVal = Math.abs(M[row][col]); maxRow = row; }
+    }
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+    if (Math.abs(M[col][col]) < 1e-15) continue;
+    for (let row = col + 1; row < n; row++) {
+      const f = M[row][col] / M[col][col];
+      for (let j = col; j <= n; j++) M[row][j] -= f * M[col][j];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    if (Math.abs(M[i][i]) < 1e-15) continue;
+    x[i] = M[i][n];
+    for (let j = i + 1; j < n; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= M[i][i];
+  }
+  return x;
+}
+
+// Lawson-Hanson NNLS
+function nnls(A, b) {
+  const m = A.length, n = A[0].length;
+  const x = new Array(n).fill(0);
+  const P = {}, Z = {};
+  for (let i = 0; i < n; i++) Z[i] = true;
+  const maxIter = 3 * n + 30;
+  for (let iter = 0; iter < maxIter; iter++) {
+    const Ax = new Array(m).fill(0);
+    for (let i = 0; i < m; i++)
+      for (let j = 0; j < n; j++) Ax[i] += A[i][j] * x[j];
+    const w = new Array(n).fill(0);
+    for (let j = 0; j < n; j++)
+      for (let i = 0; i < m; i++) w[j] += A[i][j] * (b[i] - Ax[i]);
+    let maxW = -1e30, t = -1;
+    for (const jj in Z) { const jv = +jj; if (w[jv] > maxW) { maxW = w[jv]; t = jv; } }
+    if (maxW <= 1e-10 || t < 0) break;
+    delete Z[t]; P[t] = true;
+    for (let inner = 0; inner < maxIter; inner++) {
+      const pIdx = Object.keys(P).map(Number);
+      const np = pIdx.length;
+      const AtA = [];
+      for (let pi = 0; pi < np; pi++) {
+        AtA[pi] = new Array(np).fill(0);
+        for (let pj = 0; pj < np; pj++)
+          for (let i = 0; i < m; i++) AtA[pi][pj] += A[i][pIdx[pi]] * A[i][pIdx[pj]];
+      }
+      const Atb = new Array(np).fill(0);
+      for (let pi = 0; pi < np; pi++)
+        for (let i = 0; i < m; i++) Atb[pi] += A[i][pIdx[pi]] * b[i];
+      const sp = gaussSolve(AtA, Atb);
+      let allPos = true;
+      for (let pi = 0; pi < np; pi++) if (sp[pi] < -1e-15) { allPos = false; break; }
+      if (allPos) {
+        for (let pi = 0; pi < np; pi++) x[pIdx[pi]] = Math.max(0, sp[pi]);
+        for (const jj in Z) x[+jj] = 0;
+        break;
+      }
+      let alpha = 1e30;
+      for (let pi = 0; pi < np; pi++) {
+        if (sp[pi] < -1e-15) {
+          const a2 = x[pIdx[pi]] / (x[pIdx[pi]] - sp[pi]);
+          if (a2 < alpha) alpha = a2;
+        }
+      }
+      for (let pi = 0; pi < np; pi++) x[pIdx[pi]] += alpha * (sp[pi] - x[pIdx[pi]]);
+      for (const jj in Z) x[+jj] = 0;
+      const toMove = [];
+      for (const jj in P) { const jv = +jj; if (Math.abs(x[jv]) < 1e-12) toMove.push(jv); }
+      for (const jv of toMove) { delete P[jv]; Z[jv] = true; x[jv] = 0; }
+    }
+  }
+  return x;
+}
+
+// Numerical rank via row-reduced pivot count (tolerant)
+function matRank(A) {
+  const m = A.length;
+  if (m === 0) return 0;
+  const n = A[0].length;
+  const M = A.map(row => row.slice());
+  const tol = 1e-10;
+  let rank = 0;
+  let col = 0;
+  for (let row = 0; row < m && col < n; ) {
+    let maxVal = Math.abs(M[row][col]), maxRow = row;
+    for (let r = row + 1; r < m; r++) {
+      if (Math.abs(M[r][col]) > maxVal) { maxVal = Math.abs(M[r][col]); maxRow = r; }
+    }
+    if (maxVal < tol) { col++; continue; }
+    [M[row], M[maxRow]] = [M[maxRow], M[row]];
+    for (let r = 0; r < m; r++) {
+      if (r === row) continue;
+      const f = M[r][col] / M[row][col];
+      for (let c = col; c < n; c++) M[r][c] -= f * M[row][c];
+    }
+    rank++;
+    row++;
+    col++;
+  }
+  return rank;
+}
+
+// Approximate 2-norm condition number via power iteration on AtA
+function matCond(A) {
+  const m = A.length;
+  if (m === 0) return 0;
+  const n = A[0].length;
+  if (n === 0) return 0;
+  // AtA
+  const AtA = [];
+  for (let i = 0; i < n; i++) {
+    AtA[i] = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      for (let k = 0; k < m; k++) AtA[i][j] += A[k][i] * A[k][j];
+    }
+  }
+  const smax = powerIter(AtA, 40);
+  const smin = invPowerIter(AtA, 40);
+  if (smax <= 0 || smin <= 1e-20) return Infinity;
+  return Math.sqrt(smax / smin);
+}
+
+function powerIter(M, iters) {
+  const n = M.length;
+  let v = new Array(n).fill(0).map(() => Math.random());
+  let lambda = 0;
+  for (let it = 0; it < iters; it++) {
+    const w = new Array(n).fill(0);
+    for (let i = 0; i < n; i++)
+      for (let j = 0; j < n; j++) w[i] += M[i][j] * v[j];
+    let norm = 0;
+    for (let i = 0; i < n; i++) norm += w[i] * w[i];
+    norm = Math.sqrt(norm);
+    if (norm < 1e-20) return 0;
+    for (let i = 0; i < n; i++) v[i] = w[i] / norm;
+    lambda = norm;
+  }
+  return lambda;
+}
+
+function invPowerIter(M, iters) {
+  // Estimate smallest eigenvalue via shift-and-invert on a regularized system.
+  // Ridge-stabilized: solve (M + eps I) x = v, keeps it defined when M is singular.
+  const n = M.length;
+  const eps = 1e-10 * (M[0][0] || 1);
+  const M2 = M.map((row, i) => row.map((v, j) => i === j ? v + eps : v));
+  let v = new Array(n).fill(0).map(() => Math.random());
+  let lambda = 0;
+  for (let it = 0; it < iters; it++) {
+    const w = gaussSolve(M2.map(r => r.slice()), v);
+    let norm = 0;
+    for (let i = 0; i < n; i++) norm += w[i] * w[i];
+    norm = Math.sqrt(norm);
+    if (norm < 1e-20) return 0;
+    for (let i = 0; i < n; i++) v[i] = w[i] / norm;
+    lambda = norm;
+  }
+  return lambda > 0 ? 1.0 / lambda : 0;
+}
+
+// ══════════════════════════════════════════════════════════════
+// FORWARD + SOLVER
+// ══════════════════════════════════════════════════════════════
+
+function forwardPredict(topology, edgeRates, exportArr) {
+  const { nStates, edges } = topology;
+  const Q = [];
+  for (let i = 0; i < nStates; i++) Q[i] = new Array(nStates).fill(0);
+  for (let k = 0; k < edges.length; k++) {
+    Q[edges[k].dst][edges[k].src] += edgeRates[k];
+  }
+  for (let i = 0; i < nStates; i++) {
+    let cs = 0;
+    for (let j = 0; j < nStates; j++) cs += Q[j][i];
+    Q[i][i] = -(cs + exportArr[i]);
+  }
+  const nb = new Array(nStates).fill(0);
+  nb[0] = -PRODUCTION;
+  const p = gaussSolve(Q, nb);
+  for (let i = 0; i < nStates; i++) p[i] = Math.max(0, p[i]);
+  let s = 0;
+  for (let i = 0; i < nStates; i++) s += p[i];
+  if (s > 0) for (let i = 0; i < nStates; i++) p[i] /= s;
+  return p;
+}
+
+function buildSolverMatrix(topology, pObs, activeMask) {
+  const { nStates, edges } = topology;
+  const observed = pObs.map(v => v > 1e-30);
+  const usable = [];
+  for (let k = 0; k < edges.length; k++) {
+    if (activeMask && !activeMask[k]) continue;
+    if (observed[edges[k].src]) usable.push(k);
+  }
+  const hasP = {};
+  for (const k of usable) if (observed[edges[k].dst]) hasP[edges[k].dst] = true;
+  const effR = {};
+  for (let i = 0; i < nStates; i++) if (observed[i] && !hasP[i]) effR[i] = true;
+  const useRows = [];
+  for (let i = 0; i < nStates; i++) if (observed[i] && !effR[i]) useRows.push(i);
+  const rowMap = {};
+  useRows.forEach((v, ri) => rowMap[v] = ri);
+  return { usable, useRows, rowMap };
+}
+
+// Pooled NNLS: one rate per junction (K_junc unknowns) rather than one per
+// edge. Every edge using junction j is assumed to have rate r_j. The balance
+// matrix is summed across all active edges sharing each junction. This is the
+// correct solver for the Pure-kinetic prior. Dormant junctions (no active
+// edges in any column) are dropped so the system stays well-posed.
+function solveRatesPooled(topology, pObs, exportArr, activeMask) {
+  const { edges, nJunctions } = topology;
+  const E = edges.length;
+  const sm = buildSolverMatrix(topology, pObs, activeMask);
+  const nR = sm.useRows.length;
+  const nE = sm.usable.length;
+  if (nR === 0 || nE === 0) return { rates: new Array(E).fill(0), A: [], c: [], sm };
+
+  // Build balance matrix over junction columns.
+  const Ajunc = [];
+  for (let i = 0; i < nR; i++) Ajunc[i] = new Array(nJunctions).fill(0);
+  sm.usable.forEach(k => {
+    const s = edges[k].src, d = edges[k].dst, j = edges[k].juncIdx;
+    if (sm.rowMap[d] !== undefined) Ajunc[sm.rowMap[d]][j] += pObs[s];
+    if (sm.rowMap[s] !== undefined) Ajunc[sm.rowMap[s]][j] -= pObs[s];
+  });
+  const c = sm.useRows.map(i => exportArr[i] * pObs[i]);
+
+  // Drop all-zero junction columns (no active edges on that junction).
+  const activeJunc = [];
+  for (let j = 0; j < nJunctions; j++) {
+    for (let i = 0; i < nR; i++) if (Math.abs(Ajunc[i][j]) > 1e-30) { activeJunc.push(j); break; }
+  }
+  const Ar = [];
+  for (let i = 0; i < nR; i++) Ar[i] = activeJunc.map(j => Ajunc[i][j]);
+
+  // Solve, then expand back to per-edge rates.
+  const xj = nnls(Ar, c);                     // length = activeJunc.length
+  const juncRates = new Array(nJunctions).fill(0);
+  activeJunc.forEach((j, k) => { juncRates[j] = xj[k]; });
+  const rates = new Array(E).fill(0);
+  sm.usable.forEach(k => { rates[k] = juncRates[edges[k].juncIdx]; });
+  return { rates, A: Ar, c, sm, activeJunc, juncRates };
+}
+
+function solveRates(topology, pObs, exportArr, activeMask) {
+  const { edges } = topology;
+  const E = edges.length;
+  const sm = buildSolverMatrix(topology, pObs, activeMask);
+  const nR = sm.useRows.length;
+  const nC = sm.usable.length;
+  if (nR === 0 || nC === 0) {
+    return { rates: new Array(E).fill(0), A: [], c: [], sm };
+  }
+  const A = [];
+  for (let i = 0; i < nR; i++) A[i] = new Array(nC).fill(0);
+  sm.usable.forEach((k, ci) => {
+    const s = edges[k].src, d = edges[k].dst;
+    if (sm.rowMap[d] !== undefined) A[sm.rowMap[d]][ci] += pObs[s];
+    if (sm.rowMap[s] !== undefined) A[sm.rowMap[s]][ci] -= pObs[s];
+  });
+  const c = sm.useRows.map(i => exportArr[i] * pObs[i]);
+  const xv = nnls(A, c);
+  const rates = new Array(E).fill(0);
+  sm.usable.forEach((k, ci) => { rates[k] = xv[ci]; });
+  return { rates, A, c, sm };
+}
+
+// ── Regularised per-edge solvers ──
+// Each addresses the "sparsity introduced by the algorithm, not the data" critique
+// by pinning down the vertex NNLS would otherwise pick arbitrarily.
+//
+//   Ridge  — min ‖A r − c‖² + λ‖r‖²             (shrinkage toward 0)
+//   Smooth — min ‖A r − c‖² + λ‖r − R₀·1‖²     (shrinkage toward a reference rate)
+// Both are ordinary NNLS on an augmented matrix:
+//     Ã = [ A ; √λ·I ],   c̃ = [ c ; target ]
+// where target = 0 for Ridge and √λ·R₀·1 for Smooth.
+//
+//   LASSO  — min ‖A r − c‖² + λ·1ᵀr            (explicit L1; since r≥0, L1 = 1ᵀr)
+// Solved by coordinate descent with closed-form soft-thresholded updates.
+
+function _buildPerEdgeSystem(topology, pObs, exportArr, activeMask) {
+  const { edges } = topology;
+  const E = edges.length;
+  const sm = buildSolverMatrix(topology, pObs, activeMask);
+  const nR = sm.useRows.length, nC = sm.usable.length;
+  if (nR === 0 || nC === 0) return null;
+  const A = [];
+  for (let i = 0; i < nR; i++) A[i] = new Array(nC).fill(0);
+  sm.usable.forEach((k, ci) => {
+    const s = edges[k].src, d = edges[k].dst;
+    if (sm.rowMap[d] !== undefined) A[sm.rowMap[d]][ci] += pObs[s];
+    if (sm.rowMap[s] !== undefined) A[sm.rowMap[s]][ci] -= pObs[s];
+  });
+  const c = sm.useRows.map(i => exportArr[i] * pObs[i]);
+  return { E, sm, nR, nC, A, c };
+}
+
+function solveRatesRidge(topology, pObs, exportArr, activeMask, lambda) {
+  const sys = _buildPerEdgeSystem(topology, pObs, exportArr, activeMask);
+  if (!sys) return { rates: new Array(topology.edges.length).fill(0), A: [], c: [], sm: buildSolverMatrix(topology, pObs, activeMask) };
+  const { E, sm, nR, nC, A, c } = sys;
+  const sqrtL = Math.sqrt(Math.max(0, lambda));
+  const Aaug = [];
+  for (let i = 0; i < nR; i++) Aaug.push(A[i].slice());
+  for (let j = 0; j < nC; j++) {
+    const row = new Array(nC).fill(0);
+    row[j] = sqrtL;
+    Aaug.push(row);
+  }
+  const caug = c.concat(new Array(nC).fill(0));
+  const xv = nnls(Aaug, caug);
+  const rates = new Array(E).fill(0);
+  sm.usable.forEach((k, ci) => { rates[k] = xv[ci]; });
+  return { rates, A, c, sm };
+}
+
+function solveRatesSmooth(topology, pObs, exportArr, activeMask, lambda) {
+  const sys = _buildPerEdgeSystem(topology, pObs, exportArr, activeMask);
+  if (!sys) return { rates: new Array(topology.edges.length).fill(0), A: [], c: [], sm: buildSolverMatrix(topology, pObs, activeMask) };
+  const { E, sm, nR, nC, A, c } = sys;
+  const sqrtL = Math.sqrt(Math.max(0, lambda));
+  const R0 = RATE_SCALE;
+  const Aaug = [];
+  for (let i = 0; i < nR; i++) Aaug.push(A[i].slice());
+  for (let j = 0; j < nC; j++) {
+    const row = new Array(nC).fill(0);
+    row[j] = sqrtL;
+    Aaug.push(row);
+  }
+  const caug = c.concat(new Array(nC).fill(sqrtL * R0));
+  const xv = nnls(Aaug, caug);
+  const rates = new Array(E).fill(0);
+  sm.usable.forEach((k, ci) => { rates[k] = xv[ci]; });
+  return { rates, A, c, sm };
+}
+
+function solveRatesLasso(topology, pObs, exportArr, activeMask, lambda) {
+  const sys = _buildPerEdgeSystem(topology, pObs, exportArr, activeMask);
+  if (!sys) return { rates: new Array(topology.edges.length).fill(0), A: [], c: [], sm: buildSolverMatrix(topology, pObs, activeMask) };
+  const { E, sm, nR, nC, A, c } = sys;
+  // Pre-compute AᵀA and Aᵀc
+  const AtA = [];
+  for (let i = 0; i < nC; i++) AtA[i] = new Array(nC).fill(0);
+  for (let i = 0; i < nC; i++) {
+    for (let j = 0; j < nC; j++) {
+      let s = 0;
+      for (let r = 0; r < nR; r++) s += A[r][i] * A[r][j];
+      AtA[i][j] = s;
+    }
+  }
+  const Atc = new Array(nC).fill(0);
+  for (let j = 0; j < nC; j++) {
+    let s = 0;
+    for (let r = 0; r < nR; r++) s += A[r][j] * c[r];
+    Atc[j] = s;
+  }
+  // Coordinate descent. For r ≥ 0, the L1 norm is 1ᵀr, so update is
+  //   r_j ← max(0, (Atc_j − λ − Σ_{k≠j} AtA[j,k] r_k) / AtA[j,j]).
+  const x = new Array(nC).fill(0);
+  const maxIter = 400;
+  const tol = 1e-10;
+  for (let iter = 0; iter < maxIter; iter++) {
+    let maxChange = 0;
+    for (let j = 0; j < nC; j++) {
+      const diag = AtA[j][j];
+      if (diag < 1e-30) continue;
+      let resid = Atc[j] - lambda;
+      for (let k = 0; k < nC; k++) if (k !== j) resid -= AtA[j][k] * x[k];
+      const newV = Math.max(0, resid / diag);
+      const ch = Math.abs(newV - x[j]);
+      if (ch > maxChange) maxChange = ch;
+      x[j] = newV;
+    }
+    if (maxChange < tol) break;
+  }
+  const rates = new Array(E).fill(0);
+  sm.usable.forEach((k, ci) => { rates[k] = x[ci]; });
+  return { rates, A, c, sm };
+}
+
+// Helmert basis of the (n−1)-dimensional subspace of ℝⁿ orthogonal to the
+// all-ones vector. For r ∈ ℝⁿ,   ‖H·r‖² = Σᵢ (r_i − mean(r))².
+// Used by junction-shrinkage NNLS below to encode "rates of edges sharing a
+// junction should be similar" as an augmented penalty.
+function helmertRows(n) {
+  const rows = [];
+  for (let i = 1; i < n; i++) {
+    const denom = Math.sqrt(i * (i + 1));
+    const row = new Array(n).fill(0);
+    for (let j = 0; j < i; j++) row[j] = 1 / denom;
+    row[i] = -i / denom;
+    rows.push(row);
+  }
+  return rows;
+}
+
+// ── Junction-shrinkage NNLS ─────────────────────────────────────────────
+// Structurally-aware regulariser. Penalises within-junction rate variance:
+//
+//   r̂  =  argmin_{r ≥ 0}  ‖A r − y‖²  +  λ · Σⱼ Σ_{k ∈ j} (r_k − ρⱼ(r))²
+//
+// where ρⱼ(r) is the mean rate over the edges of junction j. Encodes the
+// structural prior "edges of the same splice junction have similar rates" —
+// which is actual biology, unlike Ridge/LASSO/Smooth which encode generic
+// "small", "sparse", or "near R₀" assumptions.
+//
+// Extremes:
+//   λ = 0   → behaves like per-edge NNLS (no junction pooling).
+//   λ → ∞   → forces r_k = ρⱼ within each junction: identical to pooled NNLS.
+//   λ ≫ 0   → a principled interpolation — rates cluster around their
+//              junction means but are free to deviate when the data demands.
+//
+// Implementation: for each junction j with nⱼ ≥ 2 active edges we append the
+// Helmert rows (scaled by √λ) to A. The augmented system has more rows than
+// columns (N − 1 + Σⱼ (nⱼ − 1) = N − 1 + M − K_junc_active > M when
+// N > K_junc_active, which is essentially always true), so it is
+// overdetermined — NNLS returns a unique solution with no L&H pivoting
+// ambiguity. That closes the "sparsity is an algorithmic artifact" loophole
+// that vanilla per-edge NNLS has in underdetermined regimes.
+function solveRatesJunctionShrinkage(topology, pObs, exportArr, activeMask, lambda) {
+  const { edges, nJunctions } = topology;
+  const sys = _buildPerEdgeSystem(topology, pObs, exportArr, activeMask);
+  if (!sys) return { rates: new Array(topology.edges.length).fill(0), A: [], c: [], sm: buildSolverMatrix(topology, pObs, activeMask) };
+  const { E, sm, nR, nC, A, c } = sys;
+  const sqrtL = Math.sqrt(Math.max(0, lambda));
+
+  // Group usable column indices by junction identity.
+  const juncCols = new Array(nJunctions);
+  for (let j = 0; j < nJunctions; j++) juncCols[j] = [];
+  sm.usable.forEach((edgeK, colI) => { juncCols[edges[edgeK].juncIdx].push(colI); });
+
+  const Aaug = [];
+  for (let i = 0; i < nR; i++) Aaug.push(A[i].slice());
+  // Append √λ · Helmert(nⱼ) rows for every junction with ≥ 2 active edges.
+  for (let j = 0; j < nJunctions; j++) {
+    const cols = juncCols[j];
+    if (cols.length < 2) continue;
+    const H = helmertRows(cols.length);
+    for (const h of H) {
+      const row = new Array(nC).fill(0);
+      for (let k = 0; k < cols.length; k++) row[cols[k]] = sqrtL * h[k];
+      Aaug.push(row);
+    }
+  }
+  const caug = c.concat(new Array(Aaug.length - nR).fill(0));
+  const xv = nnls(Aaug, caug);
+  const rates = new Array(E).fill(0);
+  sm.usable.forEach((edgeK, colI) => { rates[edgeK] = xv[colI]; });
+  return { rates, A, c, sm };
+}
+
+// ── θ-aware solver: iterative hard thresholding on η ────────────────────
+// The honest "solver knows θ but not the realization's active subgraph" mode.
+//
+// Idea: η specifies that each child state c with m_c parents has
+//   k_c = max(1, round(η · m_c))
+// active incoming edges in any draw from the regime. We don't know *which* k_c,
+// only the count. The solver discovers them iteratively:
+//
+//   1. Solve per-edge NNLS on the full topology — gives a candidate r̂.
+//   2. For each child c, retain only the k_c incoming edges with the largest
+//      recovered rate; zero the others. This builds an active mask.
+//   3. Re-solve per-edge NNLS on the restricted column set.
+//   4. Re-threshold; iterate until the active mask is stable.
+//
+// Properties:
+//   • Uses θ = η (and optionally σ for an internal junction-shrinkage tuned by
+//     spread; α is ignored at this layer — it's a within-active-set weight
+//     prior that point estimation can't really exploit).
+//   • Does NOT receive the generator's activeMask. The recovered mask is
+//     purely a function of (topology, pObs, η).
+//   • At η = 0: k_c = 1 per child → discovers a tree from data.
+//   • At η = 1: k_c = m_c → no thresholding; behaves like full per-edge NNLS.
+//   • At intermediate η: per-child cardinality drives a structured search.
+//
+// Caveat: IHT is non-convex. It can get stuck in local minima if the initial
+// per-edge NNLS is wildly wrong (which happens when M ≫ N and L&H picks a
+// pathological vertex). For DADA-sized graphs it converges in ≤ 8 iterations.
+function solveRatesThetaIHT(topology, pObs, exportArr, theta, lambda) {
+  const { edges, nEdges, nStates } = topology;
+  const eta = Math.max(0, Math.min(1, theta && theta.eta != null ? theta.eta : 1));
+  const sigma = (theta && theta.sigma != null) ? theta.sigma : 1.0;
+  const maxIters = 8;
+
+  // Per-child target cardinality. m_c = number of incoming structural edges.
+  const incoming = new Array(nStates);
+  for (let i = 0; i < nStates; i++) incoming[i] = [];
+  for (let k = 0; k < nEdges; k++) incoming[edges[k].dst].push(k);
+  const kTarget = new Array(nStates).fill(0);
+  for (let i = 1; i < nStates; i++) {
+    const m = incoming[i].length;
+    if (m === 0) continue;
+    kTarget[i] = Math.max(1, Math.min(m, Math.round(eta * m)));
+  }
+
+  // Helper: solve NNLS on a given activeMask. The first iteration MUST be
+  // dense — using vanilla per-edge NNLS on an underdetermined mask gives an
+  // L&H vertex that's already sparse, so top-k thresholding just picks the
+  // vertex columns (no real search). Junction-shrinkage with a small ε turns
+  // the augmented system overdetermined and returns a dense unique solution
+  // — the polytope point closest to the junction-pooled subspace — which
+  // gives the thresholding step useful per-edge magnitudes to rank.
+  //
+  // After the first iteration the mask has been reduced to k_c per child, so
+  // the system is much smaller and per-edge NNLS (or λ if user supplied one)
+  // works fine.
+  const INIT_LAMBDA = 1e-4;     // small but nonzero — kills L&H sparsity
+  const refineLam = (lambda != null && lambda > 0) ? lambda : 0;
+  function solveDense(mask)   { return solveRatesJunctionShrinkage(topology, pObs, exportArr, mask, INIT_LAMBDA); }
+  function solveRefine(mask)  {
+    if (refineLam > 0) return solveRatesJunctionShrinkage(topology, pObs, exportArr, mask, refineLam);
+    return solveRates(topology, pObs, exportArr, mask);
+  }
+
+  // Iteration 0: solve unrestricted with a small shrinkage so we get a dense
+  // r̂ to threshold from.
+  let mask = new Array(nEdges).fill(true);
+  let last = solveDense(mask);
+  let lastRates = last.rates;
+
+  for (let iter = 0; iter < maxIters; iter++) {
+    // Threshold per child to keep top-k_c incoming edges by recovered rate.
+    const newMask = new Array(nEdges).fill(false);
+    for (let i = 1; i < nStates; i++) {
+      const inc = incoming[i];
+      const k = kTarget[i];
+      if (k === 0 || inc.length === 0) continue;
+      // Stable sort by descending rate; ties broken by edge index for determinism.
+      const sorted = inc.slice().sort((a, b) => {
+        const dr = (lastRates[b] || 0) - (lastRates[a] || 0);
+        if (dr !== 0) return dr;
+        return a - b;
+      });
+      for (let j = 0; j < Math.min(k, sorted.length); j++) newMask[sorted[j]] = true;
+    }
+
+    // Convergence check: mask unchanged → done.
+    let same = true;
+    for (let k = 0; k < nEdges; k++) if (mask[k] !== newMask[k]) { same = false; break; }
+    if (same) break;
+
+    mask = newMask;
+    last = solveRefine(mask);
+    lastRates = last.rates;
+  }
+
+  // Final solution — return rates and the discovered mask alongside the linear
+  // system pieces from the last solve, so diagnostics can introspect.
+  return {
+    rates: lastRates,
+    A: last.A, c: last.c, sm: last.sm,
+    recoveredMask: mask,
+  };
+}
+
+// R² over edges that actually carry observable flux — i.e., both src and dst have
+// non-zero steady-state abundance, AND the true rate itself is above trace level.
+// Edges that terminate in (or start from) unobserved isoforms cannot be determined
+// from the data and are excluded so they don't swamp the metric with cases that were
+// never recoverable to begin with.
+function r2Score(rec, tru, observableMask) {
+  const maxTrue = Math.max.apply(null, tru.concat([0]));
+  const TRACE = Math.max(1e-6, maxTrue * 1e-3);
+  const mask = [];
+  for (let i = 0; i < tru.length; i++) {
+    if (observableMask && !observableMask[i]) continue;
+    if (tru[i] > TRACE) mask.push(i);
+  }
+  if (mask.length < 2) return null;
+  const t = mask.map(i => tru[i]);
+  const r = mask.map(i => rec[i]);
+  let mn = 0;
+  for (const v of t) mn += v;
+  mn /= t.length;
+  let ssR = 0, ssT = 0;
+  for (let i = 0; i < t.length; i++) {
+    ssR += (r[i] - t[i]) ** 2;
+    ssT += (t[i] - mn) ** 2;
+  }
+  return ssT > 1e-15 ? 1 - ssR / ssT : null;
+}
+
+function residNorm(A, r, c) {
+  if (A.length === 0) return 0;
+  let s = 0;
+  for (let i = 0; i < A.length; i++) {
+    let sum = 0;
+    for (let j = 0; j < A[0].length; j++) sum += A[i][j] * r[j];
+    s += (sum - c[i]) ** 2;
+  }
+  return Math.sqrt(s);
+}
+
+// Per-edge identifiability = column leverage in the null space of A
+// Heuristic: for each column k, measure how much of its vector projects OUT of row space
+// Low projection out = column unique = identifiable; high = redundant = null space
+// Simplified: use norm of column AFTER projecting out other columns via regularized fit
+function computeIdentifiability(A, usable, nEdges) {
+  const score = new Array(nEdges).fill(0);
+  if (A.length === 0 || A[0].length === 0) return score;
+  const m = A.length, n = A[0].length;
+  // Score per column = ||a_k||^2 / (a_k^T a_k + lambda) — simpler norm
+  // Better: diag of hat matrix via (A^T A + lam*I)^{-1}
+  const AtA = [];
+  for (let i = 0; i < n; i++) {
+    AtA[i] = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) {
+      for (let k = 0; k < m; k++) AtA[i][j] += A[k][i] * A[k][j];
+    }
+  }
+  const lam = 1e-6 * (AtA[0][0] || 1);
+  for (let i = 0; i < n; i++) AtA[i][i] += lam;
+  // Invert AtA via solving AtA x_i = e_i
+  const inv = [];
+  for (let i = 0; i < n; i++) {
+    const ei = new Array(n).fill(0); ei[i] = 1;
+    const xi = gaussSolve(AtA.map(r => r.slice()), ei);
+    inv.push(xi);
+  }
+  // Diagonal of A (AtA)^-1 A^T is leverage per ROW (state);
+  // we want per-COLUMN info = 1 / inv[i][i]   (small inv = well-identified)
+  for (let ci = 0; ci < n; ci++) {
+    const edgeK = usable[ci];
+    const info = 1.0 / Math.max(1e-18, inv[ci][ci]);
+    score[edgeK] = info;
+  }
+  // Normalize to [0,1]
+  const maxS = Math.max(1e-18, ...score);
+  for (let k = 0; k < nEdges; k++) score[k] = score[k] / maxS;
+  return score;
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATE (application-level)
+// ══════════════════════════════════════════════════════════════
+
+const state = {
+  dadaString: 'DADADA',
+  seed: 42,
+  mode: 'mixed',                  // 'mixed' (Mixed-Dirichlet) | 'kinetic' (junction-pooled)
+  topology: null,
+  trueRates: [],
+  recRates: [],
+  pTrue: [],                      // steady-state IPD from forward map
+  pObs: [],                       // observation after Dirichlet-κ noise (same as pTrue when κ=0)
+  A: [], c: [], sm: null,
+  r2: null,
+  resid: 0,
+  rank: 0,
+  cond: 0,
+  identScore: [],
+  observable: [],
+  stateObservable: [],
+  stateVisible: [],
+  edgeVisible: [],
+  activeMask: null,
+  stateKind:  null,
+  solver: 'per-edge',
+  // Solver mode controls how much information the solver gets about the regime:
+  //   'oracle'      — receives the generator's activeMask (the realization's
+  //                   active subgraph). Cheating; useful for visualising the
+  //                   upper bound on what's recoverable given the regime.
+  //   'theta-aware' — receives θ = (η, σ, α, K). Uses η for an iterative
+  //                   hard-thresholding cardinality search. Honest.
+  //   'naive'       — receives only (topology, pObs). Vanilla NNLS.
+  solverMode: 'theta-aware',
+  lambda: 1e-6,
+  exportBase: 1.0,
+  exportProfile: 'power',
+  exportNullFrac: 1.0,
+  exportArray: [],
+  // SRV axes (Mixed-Dirichlet prior)
+  eta: 0.3,                       // structure: fraction of parents active per child
+  spread: 1.0,                    // σ: log-normal spread of junction amplitudes
+  alpha: 1.0,                     // Dirichlet concentration on active-parent weights
+  K: 0,                           // reserved placeholder axis
+  // observation noise
+  kappa: 0,                       // y ~ Dir(10^kappa · f(r)); 0 ⇒ off (y = p exactly)
+  // UI
+  showRecovered: false,
+  showIdent: false,
+  hideUnobservable: true,
+  hoveredNode: null,
+  pinnedNodes: new Set(),         // double-click to pin a sashimi badge near the node
+  editingEdge: null
+};
+
+// ══════════════════════════════════════════════════════════════
+// MAIN RECOMPUTE
+// ══════════════════════════════════════════════════════════════
+
+function getGenParams() {
+  // The Mixed-Dirichlet generator is the only one left. The three preset
+  // buttons (Predetermined / Mixed / Kinetic) just set η, α, σ to canonical
+  // values — they are not separate generators.
+  return {
+    mode: 'mixed-dirichlet',
+    sparsity: state.eta,           // generator reads this as η
+    spread: state.spread,
+    alpha: state.alpha,
+    K: state.K,
+  };
+}
+
+// Post-hoc state labelling from the active subgraph. Works for any prior that
+// sets an activeMask (Predetermined, Mixed). For Null / Pure kinetic (no mask,
+// every edge active) the labels would all be 'kinetic' or 'diamond' and aren't
+// informative, so we skip.
+//
+// Labels:
+//   'diamond'   — 2+ active incoming edges: multiple paths converge here,
+//                 breaking the "unique ancestral path" property. This is what
+//                 makes the prior NOT predetermined.
+//   'kinetic'   — ≤1 active incoming and 2+ active outgoing: kinetic
+//                 competition among outgoing junctions, but still a unique
+//                 ancestral path (predetermined-compatible).
+//   'committed' — ≤1 active incoming and exactly 1 active outgoing: no decision.
+//   'terminal'  — 0 active outgoing (a mature isoform).
+//   null        — state not touched by the active subgraph.
+function computeStateKindFromMask(topology, activeMask) {
+  const { edges, nEdges, nStates } = topology;
+  if (!activeMask) return null;
+  const inDeg  = new Array(nStates).fill(0);
+  const outDeg = new Array(nStates).fill(0);
+  for (let k = 0; k < nEdges; k++) {
+    if (!activeMask[k]) continue;
+    inDeg[edges[k].dst]++;
+    outDeg[edges[k].src]++;
+  }
+  const kind = new Array(nStates).fill(null);
+  for (let s = 0; s < nStates; s++) {
+    // State 0 (null) is always the root; treat it as reached even though inDeg=0.
+    const reached = (s === 0) || inDeg[s] > 0 || outDeg[s] > 0;
+    if (!reached) continue;
+    if (inDeg[s] >= 2)       kind[s] = 'diamond';
+    else if (outDeg[s] === 0) kind[s] = 'terminal';
+    else if (outDeg[s] >= 2)  kind[s] = 'kinetic';
+    else                      kind[s] = 'committed';
+  }
+  return kind;
+}
+
+function applyGen(gen) {
+  state.trueRates = gen.rates;
+  state.activeMask = gen.activeMask;
+  // Compute per-state labels from the active subgraph (Predetermined, Mixed).
+  // Null/Pure kinetic have no activeMask and get no labels.
+  state.stateKind = computeStateKindFromMask(state.topology, gen.activeMask);
+}
+
+function rebuild() {
+  state.topology = buildTopology(state.dadaString);
+  setSeed(state.seed);
+  applyGen(generateRates(state.topology, getGenParams()));
+  recompute();
+  render();
+}
+
+function recompute() {
+  state.exportArray = computeExportArray(
+    state.topology, state.exportBase, state.exportProfile, state.exportNullFrac
+  );
+  state.pTrue = forwardPredict(state.topology, state.trueRates, state.exportArray);
+  // Observation model: y = Dir(10^κ · f(r)). κ = 0 keeps y = p exactly; higher κ
+  // adds narrower noise. The solver sees pObs, not pTrue.
+  state.pObs = state.kappa > 0
+    ? applyObservationNoise(state.pTrue, Math.pow(10, state.kappa))
+    : state.pTrue.slice();
+  let solve;
+  // The mask the solver receives depends on state.solverMode:
+  //   'oracle'      → state.activeMask (the realization's true active subgraph)
+  //   'theta-aware' → null (solver discovers active set via η-IHT) — but for
+  //                   non-IHT solvers we fall back to null mask + θ-derived
+  //                   shrinkage where appropriate.
+  //   'naive'       → null (no mask)
+  const useOracle = (state.solverMode === 'oracle');
+  const mask = useOracle ? state.activeMask : null;
+  const theta = { eta: state.eta, sigma: state.spread, alpha: state.alpha, K: state.K };
+
+  if (state.solverMode === 'theta-aware' && state.solver !== 'pooled') {
+    // θ-aware mode uses η-IHT regardless of which "solver" the user picked,
+    // because the solver here is the structural-search wrapper. λ tunes the
+    // optional junction-shrinkage inside each NNLS step.
+    solve = solveRatesThetaIHT(state.topology, state.pObs, state.exportArray, theta,
+                               (state.solver === 'junction-shrinkage' || state.solver === 'ridge' ||
+                                state.solver === 'lasso' || state.solver === 'smooth') ? state.lambda : 0);
+  } else {
+    switch (state.solver) {
+      case 'pooled':              solve = solveRatesPooled            (state.topology, state.pObs, state.exportArray, mask); break;
+      case 'junction-shrinkage':  solve = solveRatesJunctionShrinkage (state.topology, state.pObs, state.exportArray, mask, state.lambda); break;
+      case 'ridge':               solve = solveRatesRidge             (state.topology, state.pObs, state.exportArray, mask, state.lambda); break;
+      case 'lasso':               solve = solveRatesLasso             (state.topology, state.pObs, state.exportArray, mask, state.lambda); break;
+      case 'smooth':              solve = solveRatesSmooth            (state.topology, state.pObs, state.exportArray, mask, state.lambda); break;
+      default:                    solve = solveRates                  (state.topology, state.pObs, state.exportArray, mask);
+    }
+  }
+  state.recRates = solve.rates;
+  state.A = solve.A;
+  state.c = solve.c;
+  state.sm = solve.sm;
+  // Observable mask: an edge carries measurable flux only if BOTH its endpoints have
+  // meaningful steady-state abundance. Use a *relative* threshold (fraction of the max
+  // IPD) so that states which are mathematically reachable via a vanishing rate — and
+  // therefore sit at near-machine-precision abundance — are correctly treated as
+  // unobservable. Any isoform below this threshold would be indistinguishable from
+  // zero in a real measurement.
+  const maxP = Math.max.apply(null, state.pTrue);
+  const OBS_THRESH = Math.max(1e-12, maxP * 1e-4);
+  state.stateObservable = state.pTrue.map(p => p > OBS_THRESH);
+  state.observable = state.topology.edges.map(
+    e => state.stateObservable[e.src] && state.stateObservable[e.dst]
+  );
+  // Visual mask: more lenient threshold to keep the DAG connected for display.
+  // States above 1e-6 of max are shown in the graph even if below the R² mask.
+  const VIS_THRESH = Math.max(1e-14, maxP * 1e-6);
+  state.stateVisible = state.pTrue.map(p => p > VIS_THRESH);
+  state.edgeVisible = state.topology.edges.map(
+    e => state.stateVisible[e.src] && state.stateVisible[e.dst]
+  );
+  state.r2 = r2Score(state.recRates, state.trueRates, state.observable);
+  // Residual — x is the solver's column vector (edges for per-edge, junctions for pooled).
+  if (state.solver === 'pooled' && solve.juncRates && solve.activeJunc) {
+    const xp = solve.activeJunc.map(j => solve.juncRates[j]);
+    state.resid = residNorm(solve.A, xp, solve.c);
+  } else {
+    state.resid = residNorm(solve.A, solve.sm.usable.map(k => state.recRates[k]), solve.c);
+  }
+  state.rank = matRank(solve.A);
+  state.cond = matCond(solve.A);
+  // Per-edge identifiability scores only make sense in per-edge mode. In pooled
+  // mode we report per-junction scores expanded uniformly to all edges of that
+  // junction — still informative as a colour overlay on the DAG.
+  //
+  // The score itself is O(nCols³) (explicit inverse of AᵀA), so we only pay for
+  // it when the user has the "colour by how well determined" toggle on. For
+  // Mixed priors with the full graph active this was the dominant slowdown at
+  // K ≥ 7; with the toggle off we now skip it entirely.
+  if (state.showIdent) {
+    if (state.solver === 'pooled' && solve.activeJunc) {
+      const juncScore = computeIdentifiability(solve.A, solve.activeJunc, state.topology.nJunctions);
+      state.identScore = state.topology.edges.map(e => juncScore[e.juncIdx] || 0);
+    } else {
+      state.identScore = computeIdentifiability(solve.A, solve.sm.usable, state.topology.nEdges);
+    }
+  } else {
+    state.identScore = new Array(state.topology.nEdges).fill(0);
+  }
+}
+
+function resetRates() {
+  state.trueRates = state.topology.edges.map(() => RATE_SCALE);
+  state.activeMask = null;
+  recompute();
+  render();
+}
+
+function randomize() {
+  // Seed the PRNG from state.seed before sampling so every Randomize at the
+  // same seed produces the same instance. Incrementing the seed or changing
+  // a slider re-samples without ambiguity.
+  setSeed(state.seed);
+  applyGen(generateRates(state.topology, getGenParams()));
+  recompute();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════
+// CANVAS SASHIMI
+// ══════════════════════════════════════════════════════════════
+
+function intronColor(n) {
+  return INTRON_COLORS[Math.min(n, INTRON_COLORS.length - 1)];
+}
+
+function drawSashimi(canvas, nSites, junctions, isUnspliced) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = Math.max(200, rect.width) * dpr;
+  const H = Math.max(100, rect.height) * dpr;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  if (nSites === 0) {
+    ctx.fillStyle = '#fbf8f1';
+    ctx.font = (12 * dpr) + 'px Fira Code, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('no sites', W / 2, H / 2);
+    return;
+  }
+
+  const padX = 40 * dpr;
+  const trackY = H * 0.55;
+  const trackH = Math.max(12, H * 0.09);
+  const usableW = W - 2 * padX;
+  const siteX = [];
+  for (let i = 0; i < nSites; i++) siteX.push(padX + (i + 0.5) / nSites * usableW);
+
+  // Gene body line
+  ctx.strokeStyle = '#c9bfa8';
+  ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(padX, trackY);
+  ctx.lineTo(W - padX, trackY);
+  ctx.stroke();
+
+  const geneX1 = siteX[0] - usableW / nSites / 2;
+  const geneX2 = siteX[nSites - 1] + usableW / nSites / 2;
+
+  // Base gene bar
+  ctx.fillStyle = '#fbf8f1';
+  ctx.fillRect(geneX1, trackY - trackH / 2, geneX2 - geneX1, trackH);
+
+  const activeSet = new Set();
+  junctions.forEach(j => { activeSet.add(j[0]); activeSet.add(j[1]); });
+
+  if (isUnspliced || junctions.length === 0) {
+    ctx.fillStyle = NULL_COLOR;
+    ctx.fillRect(geneX1, trackY - trackH / 2, geneX2 - geneX1, trackH);
+    ctx.fillStyle = '#fbf8f1';
+    ctx.font = (10 * dpr) + 'px Fira Code, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('unspliced pre-mRNA', W / 2, trackY);
+  } else {
+    const color = intronColor(junctions.length);
+    const intronXR = junctions.map(([d, a]) => [Math.min(siteX[d], siteX[a]), Math.max(siteX[d], siteX[a])]);
+
+    // Draw exonic regions (not inside any intron)
+    const bounds = [geneX1, ...intronXR.flat(), geneX2].sort((a, b) => a - b);
+    const unique = [...new Set(bounds)];
+    for (let i = 0; i < unique.length - 1; i++) {
+      const x1 = unique[i], x2 = unique[i + 1];
+      const mid = (x1 + x2) / 2;
+      const inIntron = intronXR.some(([a, b]) => mid > a && mid < b);
+      if (!inIntron) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x1, trackY - trackH / 2, x2 - x1, trackH);
+      }
+    }
+
+    // Arcs
+    junctions.forEach(([di, ai]) => {
+      const x1 = siteX[di], x2 = siteX[ai];
+      const arcW = Math.abs(x2 - x1);
+      const arcH = Math.min(H * 0.35, arcW * 0.55);
+      ctx.beginPath();
+      ctx.moveTo(x1, trackY);
+      ctx.bezierCurveTo(x1, trackY - arcH, x2, trackY - arcH, x2, trackY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5 * dpr;
+      ctx.stroke();
+
+      ctx.fillStyle = '#555';
+      ctx.font = (9 * dpr) + 'px Fira Code, Consolas, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('D' + di + '\u2013A' + ai, (x1 + x2) / 2, trackY - arcH - 3 * dpr);
+    });
+  }
+
+  // Site markers
+  const markerH = trackH * 1.6;
+  for (let i = 0; i < nSites; i++) {
+    const x = siteX[i];
+    const isA = activeSet.has(i);
+    const siteType = state.topology.sites[i];
+    const isDonor = siteType === 'D';
+    ctx.beginPath();
+    ctx.moveTo(x, trackY - markerH / 2);
+    ctx.lineTo(x, trackY + markerH / 2);
+    ctx.strokeStyle = isA ? (isDonor ? '#1f4e79' : '#2d7a4b') : '#c9bfa8';
+    ctx.lineWidth = (isA ? 2.5 : 1) * dpr;
+    ctx.stroke();
+
+    ctx.fillStyle = isA ? (isDonor ? '#1f4e79' : '#2d7a4b') : '#8a7e66';
+    ctx.font = (8 * dpr) + 'px Fira Code, Consolas, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(siteType + i, x, trackY + markerH / 2 + 3 * dpr);
+  }
+
+  // 5'/3'
+  ctx.fillStyle = '#8a7e66';
+  ctx.font = (8 * dpr) + 'px Fira Code, Consolas, monospace';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.fillText("5'", padX, trackY + trackH / 2 + 18 * dpr);
+  ctx.textAlign = 'right';
+  ctx.fillText("3'", W - padX, trackY + trackH / 2 + 18 * dpr);
+}
+
+// ══════════════════════════════════════════════════════════════
+// COLORS
+// ══════════════════════════════════════════════════════════════
+
+function viridis(t) {
+  t = Math.max(0, Math.min(1, t));
+  return 'rgb(' + Math.round(68 + t * (253 - 68)) + ',' + Math.round(1 + t * (231 - 1)) + ',' + Math.round(84 + t * (37 - 84)) + ')';
+}
+
+function rateColor(r, maxR) {
+  if (r < 1e-8) return '#d4cdb8';
+  const t = Math.min(1, r / maxR);
+  // Warm gray (low) → textbook-blue (high); readable on cream.
+  return 'rgb(' + Math.round(168 - t * 137) + ',' + Math.round(150 - t * 72) + ',' + Math.round(120 - t * (-1)) + ')';
+}
+
+function identColor(score) {
+  // 0 = red (null space), 0.5 = gold, 1 = forest green — tuned for cream bg.
+  if (score < 0.25) return '#c73e5a';
+  if (score < 0.6) return '#b08100';
+  return '#2d7a4b';
+}
+
+function errClass(trueR, recR) {
+  if (trueR < 1e-8 && recR < 1e-8) return 'good';
+  if (trueR < 1e-8 && recR > 1e-3) return 'bad';
+  if (trueR > 1e-3 && recR < 1e-8) return 'bad';
+  const err = Math.abs(recR - trueR) / Math.max(trueR, 1e-10);
+  if (err < 0.15) return 'good';
+  if (err < 0.5) return 'warn';
+  return 'bad';
+}
+
+function fmt(v, n) { return (v === null || v === undefined || !isFinite(v)) ? 'N/A' : (+v).toFixed(n || 3); }
+
+// ══════════════════════════════════════════════════════════════
+// TOOLTIP & EDGE POPUP
+// ══════════════════════════════════════════════════════════════
+
+const tooltipEl = document.getElementById('tooltip');
+function showTooltip(evt, html) {
+  tooltipEl.innerHTML = html;
+  tooltipEl.style.display = 'block';
+  const r = tooltipEl.getBoundingClientRect();
+  let x = evt.clientX + 14, y = evt.clientY + 14;
+  if (x + r.width > window.innerWidth - 10) x = evt.clientX - r.width - 10;
+  if (y + r.height > window.innerHeight - 10) y = evt.clientY - r.height - 10;
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top = y + 'px';
+}
+function hideTooltip() { tooltipEl.style.display = 'none'; }
+
+function showEdgePopup(evt, edgeIdx) {
+  state.editingEdge = edgeIdx;
+  const e = state.topology.edges[edgeIdx];
+  const rate = state.trueRates[edgeIdx];
+  const popup = document.getElementById('edge-popup');
+  document.getElementById('ep-title').textContent =
+    'Transition ' + state.topology.labels[e.src] + ' \u2192 ' + state.topology.labels[e.dst] + ' (junction ' + e.juncKey + ')';
+  const inp = document.getElementById('ep-input');
+  inp.value = rate.toFixed(4);
+  popup.style.display = 'block';
+  popup.style.left = (evt.clientX + 10) + 'px';
+  popup.style.top = (evt.clientY + 10) + 'px';
+  inp.focus();
+  inp.select();
+  evt.stopPropagation();
+}
+
+function closeEdgePopup() {
+  document.getElementById('edge-popup').style.display = 'none';
+  state.editingEdge = null;
+}
+
+function applyEdgeRate() {
+  if (state.editingEdge === null) return;
+  const v = parseFloat(document.getElementById('ep-input').value);
+  if (isNaN(v) || v < 0) { closeEdgePopup(); return; }
+  state.trueRates[state.editingEdge] = v;
+  closeEdgePopup();
+  recompute();
+  render();
+}
+
+document.addEventListener('click', function(e) {
+  const popup = document.getElementById('edge-popup');
+  if (popup.style.display === 'block' && !popup.contains(e.target)) closeEdgePopup();
+});
+
+document.getElementById('ep-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') applyEdgeRate();
+  if (e.key === 'Escape') closeEdgePopup();
+});
+
+function editEdgeFromTable(edgeIdx) {
+  const e = state.topology.edges[edgeIdx];
+  const rate = state.trueRates[edgeIdx];
+  const v = prompt('Transition ' + state.topology.labels[e.src] + ' \u2192 ' + state.topology.labels[e.dst] +
+    ' (junction ' + e.juncKey + ')\nSet rate:', rate.toFixed(4));
+  if (v === null) return;
+  const f = parseFloat(v);
+  if (isNaN(f) || f < 0) return;
+  state.trueRates[edgeIdx] = f;
+  recompute();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════════════════
+
+function render() {
+  renderDiagnostics();
+  renderDAG();
+  renderTable();
+  drawScatterObservable();
+  renderStatus();
+}
+
+function renderStatus() {
+  const t = state.topology;
+  const msg = t.nSites + ' sites · ' + t.nJunctions + ' junctions · ' +
+              t.nStates + ' states · ' + t.nEdges + ' edges' +
+              (t.truncated ? ' (TRUNCATED)' : '');
+  document.getElementById('status').textContent = msg;
+}
+
+function renderDiagnostics() {
+  const nRows = state.A.length;
+  const nCols = state.A.length ? state.A[0].length : 0;
+  const dof = state.rank - nCols;
+  const condLog = isFinite(state.cond) ? Math.log10(state.cond) : Infinity;
+  const r2 = state.r2;
+  const nObservable = state.observable.filter(Boolean).length;
+  const nTotal = state.topology.nEdges;
+  const pNull = state.pTrue[0] || 0;
+  const nActive = state.activeMask
+    ? state.activeMask.filter(Boolean).length
+    : state.trueRates.filter(r => r > 1e-8).length;
+
+  let verdictClass = 'good', verdictText = 'RATES RECOVERABLE';
+  if (nCols === 0) { verdictClass = 'warn'; verdictText = 'NO DATA'; }
+  else if (state.rank < nCols) { verdictClass = 'bad'; verdictText = 'AMBIGUOUS'; }
+  else if (condLog > 6) { verdictClass = 'warn'; verdictText = 'NOISE-SENSITIVE'; }
+  else if (state.rank >= nCols && r2 !== null && r2 > 0.99) { verdictClass = 'good'; verdictText = 'RATES RECOVERED'; }
+  else if (r2 !== null && r2 < 0) { verdictClass = 'bad'; verdictText = 'SOLVER FAILED'; }
+  const vEl = document.getElementById('verdict');
+  vEl.className = 'verdict ' + verdictClass;
+  vEl.textContent = verdictText;
+
+  const put = (id, val, cls) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = val;
+    el.className = 'val' + (cls ? ' ' + cls : '');
+  };
+  put('d-rows', nRows);
+  put('d-cols', nCols);
+  put('d-rank', state.rank, state.rank === nCols ? 'good' : 'bad');
+  put('d-null', -dof);
+  put('d-cond', isFinite(condLog) ? condLog.toFixed(2) : '∞',
+      condLog > 8 ? 'bad' : condLog > 6 ? 'warn' : 'good');
+  const r2Class = r2 === null ? '' : (r2 > 0.95 ? 'good' : r2 > 0.5 ? 'warn' : 'bad');
+  put('d-r2', fmt(r2, 3), r2Class);
+  put('d-obs', nObservable + ' / ' + nTotal);
+  put('d-resid', fmt(state.resid, 4));
+  put('d-p0', (pNull * 100).toFixed(2) + '%',
+      pNull > 0.3 ? 'bad' : pNull > 0.05 ? 'warn' : 'good');
+  put('d-active', nActive + ' / ' + nTotal);
+}
+
+function _unused_old_renderDiagnostics() {
+  const el = document.getElementById('diagnostics');
+  const nRows = state.A.length;
+  const nCols = state.A.length ? state.A[0].length : 0;
+  const dof = state.rank - nCols;
+  const condLog = isFinite(state.cond) ? Math.log10(state.cond) : Infinity;
+  const r2 = state.r2;
+
+  let verdictClass = 'good', verdictText = 'RATES RECOVERABLE';
+  if (nCols === 0) { verdictClass = 'warn'; verdictText = 'NO DATA'; }
+  else if (state.rank < nCols) { verdictClass = 'bad'; verdictText = 'AMBIGUOUS'; }
+  else if (condLog > 6) { verdictClass = 'warn'; verdictText = 'NOISE-SENSITIVE'; }
+  else if (state.rank >= nCols && r2 !== null && r2 > 0.99) { verdictClass = 'good'; verdictText = 'RATES RECOVERED'; }
+  else if (r2 !== null && r2 < 0) { verdictClass = 'bad'; verdictText = 'SOLVER FAILED'; }
+
+  const r2Class = r2 === null ? '' : (r2 > 0.95 ? 'good' : r2 > 0.5 ? 'warn' : 'bad');
+
+  const pNull = state.pTrue[0] || 0;
+  const pNullClass = pNull > 0.3 ? 'bad' : pNull > 0.05 ? 'warn' : 'good';
+
+  const nObservable = state.observable.filter(Boolean).length;
+  const nTotal = state.topology.nEdges;
+
+  el.innerHTML =
+    '<span class="verdict ' + verdictClass + '">' + verdictText + '</span>' +
+    '<span class="metric"><span class="label">Balance rows</span><span class="val">' + nRows + '</span></span>' +
+    '<span class="metric"><span class="label">Unknowns</span><span class="val">' + nCols + '</span></span>' +
+    '<span class="metric ' + (state.rank === nCols ? 'good' : 'bad') + '"><span class="label">rank(A)</span><span class="val">' + state.rank + '</span></span>' +
+    '<span class="metric"><span class="label">Nullity</span><span class="val">' + (-dof) + '</span></span>' +
+    '<span class="metric ' + (condLog > 8 ? 'bad' : condLog > 6 ? 'warn' : 'good') + '"><span class="label">log\u2081\u2080 \u03ba(A)</span><span class="val">' + (isFinite(condLog) ? condLog.toFixed(2) : '\u221e') + '</span></span>' +
+    '<span class="metric ' + r2Class + '"><span class="label">R\u00b2 (observable edges)</span><span class="val">' + fmt(r2, 3) + '</span></span>' +
+    '<span class="metric"><span class="label">Observable edges</span><span class="val">' + nObservable + ' / ' + nTotal + '</span></span>' +
+    '<span class="metric"><span class="label">\u2016A r\u0302 \u2212 y\u2016\u2082</span><span class="val">' + fmt(state.resid, 4) + '</span></span>' +
+    '<span class="metric ' + pNullClass + '"><span class="label">p(s\u2080)</span><span class="val">' + (pNull * 100).toFixed(2) + '%</span></span>';
+}
+
+function renderDAG() {
+  const container = document.getElementById('dag-container');
+  const t = state.topology;
+  const maxLayer = Math.max.apply(null, t.layers);
+
+  // Semi-elliptical layout: root s₀ at top-centre, each layer L on a concentric
+  // hemi-ellipse with radii (L·rx, L·ry). rx scales with the DAG container's
+  // width so wide windows fill horizontally; ry scales with a target aspect
+  // ratio so tall layers fit. Terminals sit on the outer hemi-ellipse. Within
+  // each layer, states are ordered by a barycenter-of-parents heuristic so
+  // children cluster beneath their parents.
+  const byLayer = [];
+  for (let L = 0; L <= maxLayer; L++) byLayer.push([]);
+  for (let i = 0; i < t.nStates; i++) byLayer[t.layers[i]].push(i);
+
+  // Take canvas width from the DAG container; fall back to 800.
+  const cw = Math.max(420, (container && container.clientWidth) ? container.clientWidth - 4 : 800);
+  const titleBand = 48;
+  const topPad    = 30;
+  const bottomPad = 60;
+  const W = cw;
+  // Target aspect ≈ 0.58 × W, bounded so tall genes don't blow up.
+  const H = Math.max(360, Math.min(720, Math.round(W * 0.58)));
+  const cx = W / 2;
+  const topY = titleBand + topPad;
+  // Semi-ellipse radii per layer.
+  const drX = (W / 2 - 60) / Math.max(maxLayer, 1);
+  const drY = (H - titleBand - topPad - bottomPad) / Math.max(maxLayer, 1);
+
+  // Tidy-tree layout: build a primary-flow spanning tree (each state's parent
+  // is the in-edge with the highest rate — falls back to lowest-indexed parent
+  // for rate-0 states), then allocate angular intervals top-down, giving each
+  // sibling subtree an angular slice proportional to its leaf count. Sibling
+  // subtrees never overlap; a pure tree (γ = 0) renders as an actual tree.
+  // Non-tree edges (γ > 0 diamonds) arc across sibling slices as curves, which
+  // is exactly what you want to see.
+  const incomingEdges = new Array(t.nStates);
+  for (let i = 0; i < t.nStates; i++) incomingEdges[i] = [];
+  for (let k = 0; k < t.edges.length; k++) incomingEdges[t.edges[k].dst].push(k);
+
+  const childrenOf = new Array(t.nStates);
+  for (let i = 0; i < t.nStates; i++) childrenOf[i] = [];
+  for (let i = 1; i < t.nStates; i++) {
+    // Primary parent = source of the incoming edge with the highest true rate.
+    // Ties broken toward the lower-indexed parent for determinism.
+    let bestSrc = -1, bestRate = -1;
+    for (const k of incomingEdges[i]) {
+      const r = state.trueRates[k] || 0;
+      const src = t.edges[k].src;
+      if (r > bestRate || (r === bestRate && (bestSrc === -1 || src < bestSrc))) {
+        bestRate = r; bestSrc = src;
+      }
+    }
+    if (bestSrc < 0) {
+      // No rates yet (initial render) — use lowest-indexed parent.
+      for (const k of incomingEdges[i]) {
+        const src = t.edges[k].src;
+        if (bestSrc < 0 || src < bestSrc) bestSrc = src;
+      }
+    }
+    childrenOf[bestSrc].push(i);
+  }
+
+  // Subtree leaf counts via post-order. Every state contributes width ≥ 1 so
+  // solo chains still get finite angular width.
+  const subtreeWidth = new Array(t.nStates).fill(1);
+  (function measure(i) {
+    const kids = childrenOf[i];
+    if (!kids.length) { subtreeWidth[i] = 1; return; }
+    let w = 0;
+    for (const c of kids) { measure(c); w += subtreeWidth[c]; }
+    subtreeWidth[i] = w;
+  })(0);
+
+  // Angular range per state.
+  const angMargin = 0.08;
+  const angMin = new Array(t.nStates);
+  const angMax = new Array(t.nStates);
+  angMin[0] = angMargin;
+  angMax[0] = Math.PI - angMargin;
+  (function allocate(i) {
+    const kids = childrenOf[i].slice().sort((a, b) => t.labels[a].localeCompare(t.labels[b]));
+    if (!kids.length) return;
+    const total = kids.reduce((s, c) => s + subtreeWidth[c], 0);
+    const span = angMax[i] - angMin[i];
+    let cur = angMin[i];
+    for (const c of kids) {
+      const w = span * subtreeWidth[c] / total;
+      angMin[c] = cur;
+      angMax[c] = cur + w;
+      cur += w;
+      allocate(c);
+    }
+  })(0);
+
+  const pos = new Array(t.nStates);
+  const angle = new Array(t.nStates).fill(Math.PI / 2);
+  pos[0] = { x: cx, y: topY };
+  angle[0] = Math.PI / 2;
+  for (let i = 1; i < t.nStates; i++) {
+    const theta = (angMin[i] + angMax[i]) / 2;
+    angle[i] = theta;
+    const L = t.layers[i];
+    pos[i] = { x: cx + drX * L * Math.cos(theta), y: topY + drY * L * Math.sin(theta) };
+  }
+
+  // Cubic-Bezier path parameterised on the ellipse family. Both control points
+  // sit on the same (ellipse at layer L_s + 1/3·ΔL, θ_s) and (ellipse at layer
+  // L_s + 2/3·ΔL, θ_d) respectively, so the curve emerges tangent to each
+  // node's spoke and sweeps smoothly along the layer geometry.
+  function pointAt(L, theta) {
+    return { x: cx + drX * L * Math.cos(theta), y: topY + drY * L * Math.sin(theta) };
+  }
+  function edgePath(s, d) {
+    const Ls = t.layers[s], Ld = t.layers[d];
+    const dL = Ld - Ls;
+    const ths = (s === 0) ? angle[d] : angle[s];
+    const thd = angle[d];
+    const P0 = pos[s], P3 = pos[d];
+    const P1 = pointAt(Ls + dL / 3, ths);
+    const P2 = pointAt(Ls + 2 * dL / 3, thd);
+    return 'M ' + P0.x + ' ' + P0.y +
+           ' C ' + P1.x + ' ' + P1.y +
+           ' ' + P2.x + ' ' + P2.y +
+           ' ' + P3.x + ' ' + P3.y;
+  }
+  function edgeMid(s, d) {
+    const Ls = t.layers[s], Ld = t.layers[d];
+    const dL = Ld - Ls;
+    const ths = (s === 0) ? angle[d] : angle[s];
+    const thd = angle[d];
+    const P0 = pos[s], P3 = pos[d];
+    const P1 = pointAt(Ls + dL / 3, ths);
+    const P2 = pointAt(Ls + 2 * dL / 3, thd);
+    return {
+      x: (P0.x + 3 * P1.x + 3 * P2.x + P3.x) / 8,
+      y: (P0.y + 3 * P1.y + 3 * P2.y + P3.y) / 8,
+    };
+  }
+
+  const pVals = state.pTrue.filter(v => v > 0);
+  const maxP = pVals.length ? Math.max.apply(null, pVals) : 1;
+  const rVals = state.trueRates.filter(v => v > 0);
+  const maxR = rVals.length ? Math.max.apply(null, rVals) : 0.01;
+  const recVals = state.recRates.filter(v => v > 0);
+  const maxRecR = recVals.length ? Math.max.apply(null, recVals) : 0.01;
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'dag');
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+  // Concentric layer guide arcs — dashed hemi-ellipses below the root.
+  for (let L = 1; L <= maxLayer; L++) {
+    const rx = drX * L, ry = drY * L;
+    const arc = document.createElementNS(ns, 'path');
+    arc.setAttribute('class', 'layer-ring');
+    arc.setAttribute('d',
+      'M ' + (cx - rx) + ' ' + topY +
+      ' A ' + rx + ' ' + ry + ' 0 0 1 ' + (cx + rx) + ' ' + topY);
+    svg.appendChild(arc);
+  }
+
+  const title = document.createElementNS(ns, 'text');
+  title.setAttribute('x', W / 2); title.setAttribute('y', 18);
+  title.setAttribute('text-anchor', 'middle');
+  title.setAttribute('fill', '#1a1a1a');
+  title.setAttribute('font-size', '11');
+  title.setAttribute('font-family', 'Fira Code, Consolas, monospace');
+  const priorName = state.mode === 'kinetic' ? 'Kinetic' : 'Mixed-Dirichlet';
+  const knobs = state.mode === 'kinetic'
+    ? '\u03c3=' + state.spread.toFixed(2)
+    : '\u03b7=' + state.eta.toFixed(2) + ', \u03c3=' + state.spread.toFixed(2) +
+      ', \u03b1=' + (state.alpha < 1 ? state.alpha.toFixed(2) : state.alpha.toFixed(1));
+  title.textContent = 'DADA = "' + state.dadaString + '"  |  ' + priorName +
+                      '  (' + knobs + ')  |  seed=' + state.seed +
+                      '  |  click any transition to edit \u00b7 hover/dbl-click nodes';
+  svg.appendChild(title);
+
+  // Legend line, only under Mixed: explain the K/C/T/● badges.
+  if (state.stateKind) {
+    const leg = document.createElementNS(ns, 'text');
+    leg.setAttribute('x', W / 2); leg.setAttribute('y', 32);
+    leg.setAttribute('text-anchor', 'middle');
+    leg.setAttribute('font-size', '10');
+    leg.setAttribute('font-family', 'Fira Code, Consolas, monospace');
+    function addSpan(ch, color, bold, after) {
+      const s1 = document.createElementNS(ns, 'tspan');
+      s1.setAttribute('fill', color);
+      if (bold) s1.setAttribute('font-weight', '700');
+      s1.textContent = ch;
+      leg.appendChild(s1);
+      if (after) {
+        const s2 = document.createElementNS(ns, 'tspan');
+        s2.setAttribute('fill', '#555');
+        s2.textContent = after;
+        leg.appendChild(s2);
+      }
+    }
+    addSpan('K', '#c73e5a', true, ' kinetic branching   ');
+    addSpan('C', '#1f4e79', true, ' committed   ');
+    addSpan('D', '#7a3fd6', true, ' diamond (multi-parent, breaks predetermined)   ');
+    addSpan('●', '#555', false, ' terminal');
+    svg.appendChild(leg);
+  }
+
+  // Edges (visible + wide hit area). Inactive (rate ≈ 0) edges are hidden when
+  // "Hide unobservable" is on — otherwise Predetermined / Mixed at γ = 0 leaves
+  // dozens of faint background curves that make the tree hard to see.
+  t.edges.forEach((e, k) => {
+    if (state.hideUnobservable && !state.edgeVisible[k]) return;
+    const r = state.trueRates[k];
+    if (state.hideUnobservable && r < 1e-8) return;
+    const s = e.src, d = e.dst;
+    const baseCol = state.showIdent ? identColor(state.identScore[k] || 0) : rateColor(r, maxR);
+    const w = r > 1e-8 ? 1.5 + 4 * r / maxR : 0.8;
+    const op = r > 1e-8 ? 0.75 : 0.22;
+
+    const pathD = edgePath(s, d);
+    const hit = document.createElementNS(ns, 'path');
+    hit.setAttribute('class', 'edge-hit');
+    hit.setAttribute('d', pathD);
+    hit.setAttribute('data-k', k);
+    hit.addEventListener('mouseenter', (ev) => {
+      let tt = '<div class="tt-title">' + t.labels[s] + ' \u2192 ' + t.labels[d] + '</div>';
+      tt += '<div>Junction: ' + e.juncKey + '</div>';
+      tt += '<div>True rate: <span style="color:#1f4e79">' + (r > 1e-8 ? r.toFixed(4) : '0 (inactive)') + '</span></div>';
+      if (state.showRecovered) tt += '<div>Recovered: <span style="color:#c56c2c">' + state.recRates[k].toFixed(4) + '</span></div>';
+      if (state.showIdent) tt += '<div>How well determined: <span style="color:' + identColor(state.identScore[k] || 0) + '">' + ((state.identScore[k] || 0) * 100).toFixed(0) + '%</span></div>';
+      tt += '<div style="color:#555;margin-top:4px">Click to edit</div>';
+      showTooltip(ev, tt);
+      const vis = svg.querySelector('path.edge-vis[data-k="' + k + '"]');
+      if (vis) { vis.setAttribute('stroke', '#1f4e79'); vis.setAttribute('opacity', '1'); vis.setAttribute('stroke-width', Math.max(w, 3)); }
+    });
+    hit.addEventListener('mouseleave', () => {
+      hideTooltip();
+      const vis = svg.querySelector('path.edge-vis[data-k="' + k + '"]');
+      if (vis) { vis.setAttribute('stroke', baseCol); vis.setAttribute('opacity', op); vis.setAttribute('stroke-width', w); }
+    });
+    hit.addEventListener('click', (ev) => { hideTooltip(); showEdgePopup(ev, k); });
+    svg.appendChild(hit);
+
+    const line = document.createElementNS(ns, 'path');
+    line.setAttribute('class', 'edge-vis');
+    line.setAttribute('data-k', k);
+    line.setAttribute('d', pathD);
+    line.setAttribute('stroke', baseCol);
+    line.setAttribute('stroke-width', w);
+    line.setAttribute('opacity', op);
+    line.setAttribute('pointer-events', 'none');
+    svg.appendChild(line);
+
+    if (r > 1e-8 && t.nStates <= 40) {
+      const m = edgeMid(s, d);
+      const rt = document.createElementNS(ns, 'text');
+      rt.setAttribute('x', m.x);
+      rt.setAttribute('y', m.y - 4);
+      rt.setAttribute('text-anchor', 'middle');
+      rt.setAttribute('fill', '#555');
+      rt.setAttribute('font-size', '9');
+      rt.setAttribute('font-family', 'Fira Code, Consolas, monospace');
+      rt.setAttribute('pointer-events', 'none');
+      rt.textContent = r.toFixed(2);
+      svg.appendChild(rt);
+    }
+  });
+
+  // Recovered overlay
+  if (state.showRecovered) {
+    t.edges.forEach((e, k) => {
+      if (state.hideUnobservable && !state.edgeVisible[k]) return;
+      const rr = state.recRates[k];
+      if (rr < 1e-8) return;
+      const s = e.src, d = e.dst;
+      const w = 1 + 3 * rr / maxRecR;
+      const ln = document.createElementNS(ns, 'path');
+      ln.setAttribute('d', edgePath(s, d));
+      ln.setAttribute('fill', 'none');
+      ln.setAttribute('stroke', '#c56c2c');
+      ln.setAttribute('stroke-width', w);
+      ln.setAttribute('opacity', '0.4');
+      ln.setAttribute('stroke-dasharray', '6,3');
+      ln.setAttribute('pointer-events', 'none');
+      svg.appendChild(ln);
+    });
+  }
+
+  // Nodes
+  for (let i = 0; i < t.nStates; i++) {
+    if (state.hideUnobservable && !state.stateVisible[i]) continue;
+    const p = state.pTrue[i];
+    const r = p > 1e-6 ? 7 + 20 * p / maxP : 4;
+    const col = p > 1e-6 ? viridis(p / maxP) : '#d4cdb8';
+    const op = p > 1e-6 ? 0.9 : 0.4;
+    const isSel = state.pinnedNodes.has(i);
+
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('class', 'node');
+    c.setAttribute('cx', pos[i].x); c.setAttribute('cy', pos[i].y);
+    c.setAttribute('r', r);
+    c.setAttribute('fill', col);
+    c.setAttribute('opacity', op);
+    c.setAttribute('stroke', isSel ? '#c56c2c' : '#1a1a1a');
+    c.setAttribute('stroke-width', isSel ? '2.5' : '0.5');
+    (function(nodeIdx) {
+      c.addEventListener('mouseenter', (ev) => {
+        state.hoveredNode = nodeIdx;
+        showSashimiTip(nodeIdx, ev);
+      });
+      c.addEventListener('mousemove', (ev) => {
+        if (state.hoveredNode === nodeIdx) showSashimiTip(nodeIdx, ev);
+      });
+      c.addEventListener('mouseleave', () => {
+        state.hoveredNode = null;
+        hideSashimiTip();
+      });
+      c.addEventListener('dblclick', () => {
+        // Toggle pinned sashimi near this node. Pinned nodes get a small inline
+        // sashimi drawn alongside them so the user doesn't have to re-hover.
+        if (state.pinnedNodes.has(nodeIdx)) state.pinnedNodes.delete(nodeIdx);
+        else state.pinnedNodes.add(nodeIdx);
+        renderDAG();
+      });
+    })(i);
+    svg.appendChild(c);
+
+    // Pinned sashimi badge — render a tiny inline sashimi canvas anchored to
+    // the node's position, offset radially outward.
+    if (state.pinnedNodes.has(i)) {
+      const vx = pos[i].x - cx, vy = pos[i].y - topY;
+      const vn = Math.hypot(vx, vy) || 1;
+      const off = r + 58;
+      const bx = (i === 0) ? pos[i].x - 70  : pos[i].x + (vx / vn) * off - 70;
+      const by = (i === 0) ? pos[i].y - r - 50 : pos[i].y + (vy / vn) * off - 22;
+      const fo = document.createElementNS(ns, 'foreignObject');
+      fo.setAttribute('x', bx);
+      fo.setAttribute('y', by);
+      fo.setAttribute('width', 140);
+      fo.setAttribute('height', 50);
+      fo.setAttribute('pointer-events', 'none');
+      const wrap = document.createElement('div');
+      wrap.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+      wrap.style.cssText = 'background:rgba(251,248,241,0.96);border:1px solid #7a4b2b;border-radius:4px;padding:3px 4px;font-family:Fira Code,monospace;font-size:8.5px;line-height:1.2;color:#1a1a1a;';
+      wrap.innerHTML = '<div style="color:#7a4b2b;font-weight:700;font-size:9px">' +
+        t.labels[i] + '</div>';
+      const pinCanvas = document.createElement('canvas');
+      pinCanvas.width = 130; pinCanvas.height = 30;
+      pinCanvas.style.cssText = 'display:block;width:130px;height:30px;background:#fbf8f1;border:1px solid #c9bfa8;border-radius:2px;margin-top:2px';
+      wrap.appendChild(pinCanvas);
+      fo.appendChild(wrap);
+      svg.appendChild(fo);
+      // Draw the sashimi after the foreignObject is in the DOM.
+      setTimeout(() => {
+        const sash = t.sashimi[i];
+        drawSashimi(pinCanvas, t.nSites, sash, sash.length === 0);
+      }, 0);
+    }
+
+    if (p > maxP * 0.03 || t.nStates <= 30) {
+      // Place label radially outward from the root, so it never overlaps a
+      // sibling. The root's own label sits just above it.
+      const vx = pos[i].x - cx, vy = pos[i].y - topY;
+      const vn = Math.hypot(vx, vy) || 1;
+      const off = r + 8;
+      const lx = (i === 0) ? pos[i].x          : pos[i].x + (vx / vn) * off;
+      const ly = (i === 0) ? pos[i].y - r - 5  : pos[i].y + (vy / vn) * off;
+      const anchor = (i === 0) ? 'middle' : (vx >  0.15 * vn ? 'start' : vx < -0.15 * vn ? 'end' : 'middle');
+      const baseline = (i === 0) ? 'auto' : (vy > 0.15 * vn ? 'hanging' : vy < -0.15 * vn ? 'alphabetic' : 'middle');
+      const lbl = document.createElementNS(ns, 'text');
+      lbl.setAttribute('x', lx); lbl.setAttribute('y', ly);
+      lbl.setAttribute('text-anchor', anchor);
+      lbl.setAttribute('dominant-baseline', baseline);
+      lbl.setAttribute('fill', '#555');
+      lbl.setAttribute('font-size', '9');
+      lbl.setAttribute('font-family', 'Fira Code, Consolas, monospace');
+      lbl.setAttribute('pointer-events', 'none');
+      // The sashimi tooltip already shows the junction structure, so keep the
+      // on-graph label short: just the state index sᵢ.
+      lbl.textContent = (i === 0) ? 's₀' : ('s' + i);
+      svg.appendChild(lbl);
+    }
+
+    // Per-state badge, populated whenever the prior has an active subgraph:
+    //   K (red)    — kinetic competition: 2+ outgoing active, ≤1 incoming
+    //   C (blue)   — committed/trivial: 1 outgoing active, ≤1 incoming
+    //   D (purple) — diamond: 2+ incoming active — this state has multiple
+    //                ancestral paths, breaking "predetermined". Structurally
+    //                this is what distinguishes Mixed from Predetermined.
+    //   ● (muted)  — terminal isoform (0 outgoing).
+    if (state.stateKind && state.stateKind[i]) {
+      const kind = state.stateKind[i];
+      let char, color;
+      if      (kind === 'kinetic')   { char = 'K'; color = '#c73e5a'; }
+      else if (kind === 'committed') { char = 'C'; color = '#1f4e79'; }
+      else if (kind === 'diamond')   { char = 'D'; color = '#7a3fd6'; }
+      else                           { char = '●'; color = '#555'; }
+      const badge = document.createElementNS(ns, 'text');
+      badge.setAttribute('x', pos[i].x + r + 8);
+      badge.setAttribute('y', pos[i].y + 4);
+      badge.setAttribute('text-anchor', 'middle');
+      badge.setAttribute('fill', color);
+      badge.setAttribute('font-size', '11');
+      badge.setAttribute('font-weight', '700');
+      badge.setAttribute('font-family', 'Fira Code, Consolas, monospace');
+      badge.setAttribute('pointer-events', 'none');
+      badge.textContent = char;
+      svg.appendChild(badge);
+    }
+  }
+
+  container.innerHTML = '';
+  container.appendChild(svg);
+}
+
+// Sashimi is now shown as a hover tooltip (see showSashimiTip) and optionally
+// pinned near the node on double-click. The old below-DAG sashimi panel has
+// been removed, so this function is a no-op retained for call-site compatibility.
+function renderSashimi() {}
+
+// Render sashimi for a given state into the floating tooltip canvas, with a
+// title and abundance sub-line.
+function showSashimiTip(nodeIdx, evt) {
+  const tip = document.getElementById('sashimi-tip');
+  if (nodeIdx == null) { tip.style.display = 'none'; return; }
+  const t = state.topology;
+  const sash = t.sashimi[nodeIdx];
+  const isUnspliced = sash.length === 0;
+  document.getElementById('st-title').textContent = t.labels[nodeIdx];
+  document.getElementById('st-sub').textContent =
+    (isUnspliced ? 'unspliced pre-mRNA' : sash.length + ' junction' + (sash.length > 1 ? 's' : '')) +
+    ' · layer ' + t.layers[nodeIdx] +
+    ' · p = ' + (state.pTrue[nodeIdx] || 0).toExponential(2);
+  const canvas = document.getElementById('st-canvas');
+  drawSashimi(canvas, t.nSites, sash, isUnspliced);
+  tip.style.display = 'block';
+  if (evt) {
+    const x = Math.min(evt.clientX + 14, window.innerWidth - 340);
+    const y = Math.min(evt.clientY + 14, window.innerHeight - 120);
+    tip.style.left = x + 'px';
+    tip.style.top  = y + 'px';
+  }
+}
+function hideSashimiTip() {
+  document.getElementById('sashimi-tip').style.display = 'none';
+}
+
+function renderTable() {
+  const t = state.topology;
+  const el = document.getElementById('table-container');
+  // Trace-level rates (tiny tails of Gaussian smoothing) are effectively noise.
+  // Suppress error% for rates below this threshold to avoid meaningless 100% entries.
+  const maxTrue = Math.max.apply(null, state.trueRates.concat([0]));
+  const TRACE = Math.max(1e-6, maxTrue * 1e-3);
+  const hideUnobs = state.hideUnobservable;
+
+  const headers = ['<th class="left">Transition (state \u2192 junction)</th>',
+                   '<th>True rate</th>', '<th>Recovered</th>',
+                   '<th>Error %</th>', '<th>How well determined</th>'];
+  if (!hideUnobs) headers.push('<th>Observable</th>');
+  let html = '<table><tr>' + headers.join('') + '</tr>';
+
+  let hiddenUnobs = 0, hiddenZero = 0;
+  for (let k = 0; k < t.edges.length; k++) {
+    const e = t.edges[k];
+    const tr = state.trueRates[k];
+    const rr = state.recRates[k];
+    const obs = state.observable[k];
+    if (hideUnobs && !obs) { hiddenUnobs++; continue; }
+    if (tr < TRACE && rr < TRACE) { hiddenZero++; continue; }
+    const errPct = tr > TRACE ? ((Math.abs(rr - tr) / tr) * 100).toFixed(1) + '%' : (rr > TRACE ? 'spurious' : 'trace');
+    const ec = errClass(tr, rr);
+    const id = state.identScore[k] || 0;
+    const idClass = id > 0.6 ? 'good' : id > 0.25 ? 'warn' : 'bad';
+    const rowStyle = (!hideUnobs && !obs) ? ' style="opacity:0.4"' : '';
+    html += '<tr' + rowStyle + '>';
+    html += '<td class="left">' + t.labels[e.src] + ' \u2192 ' + e.juncKey + '</td>';
+    html += '<td class="editable" onclick="editEdgeFromTable(' + k + ')">' + tr.toFixed(3) + '</td>';
+    html += '<td class="' + ec + '">' + rr.toFixed(3) + '</td>';
+    html += '<td class="' + ec + '">' + (obs ? errPct : '\u2014') + '</td>';
+    html += '<td class="' + idClass + '">' + (id * 100).toFixed(0) + '%</td>';
+    if (!hideUnobs) html += '<td>' + (obs ? 'yes' : 'no') + '</td>';
+    html += '</tr>';
+  }
+  html += '</table>';
+  const notes = [];
+  if (hiddenUnobs > 0) notes.push(hiddenUnobs + ' unobservable (src or dst isoform never forms) — turn on "Show all nodes & edges" to reveal them');
+  if (hiddenZero > 0) notes.push(hiddenZero + ' with true=0 and recovered=0');
+  if (notes.length) html += '<div class="legend" style="margin-top:6px">Hidden: ' + notes.join('; ') + '.</div>';
+  el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// EVENT WIRING — new layout (top-bar, priors, solver, toggles)
+// ══════════════════════════════════════════════════════════════
+
+const dadaInput     = document.getElementById('dada-input');
+const seedInput     = document.getElementById('seed-input');
+const applyBtn      = document.getElementById('apply-btn');
+const randomizeBtn  = document.getElementById('randomize-btn');
+const resetBtn      = document.getElementById('reset-btn');
+const modeToggle    = document.getElementById('mode-toggle');
+
+// Priors sliders
+const sEta          = document.getElementById('s-eta');
+const vEta          = document.getElementById('v-eta');
+const sSigma        = document.getElementById('s-sigma');
+const vSigma        = document.getElementById('v-sigma');
+const sAlpha        = document.getElementById('s-alpha');
+const vAlpha        = document.getElementById('v-alpha');
+const sK            = document.getElementById('s-K');
+const vK            = document.getElementById('v-K');
+const blockEta      = document.getElementById('block-eta');
+const blockAlpha    = document.getElementById('block-alpha');
+const blockK        = document.getElementById('block-K');
+
+// Solver
+const solverModeSel = document.getElementById('solver-mode');
+const solverSelect  = document.getElementById('solver-select');
+const blockLambda   = document.getElementById('block-lambda');
+const sLambda       = document.getElementById('s-lambda');
+const vLambda       = document.getElementById('v-lambda');
+const SOLVERS_USING_LAMBDA = new Set(['ridge', 'lasso', 'smooth', 'junction-shrinkage']);
+
+// Solver-mode toggle wiring — re-runs recompute on change.
+if (solverModeSel) {
+  solverModeSel.addEventListener('change', () => {
+    state.solverMode = solverModeSel.value;
+    recompute();
+    render();
+  });
+}
+
+// Additional parameters
+const profileSel    = document.getElementById('export-profile');
+const sNullfrac     = document.getElementById('s-nullfrac');
+const vNullfrac     = document.getElementById('v-nullfrac');
+const sKappa        = document.getElementById('s-kappa');
+const vKappa        = document.getElementById('v-kappa');
+const profileCanvas = document.getElementById('profile-canvas');
+
+// Toggles
+const showRecBox    = document.getElementById('show-recovered');
+const showIdentBox  = document.getElementById('show-ident');
+const showAllBox    = document.getElementById('show-all');
+
+// About modal
+const aboutBtn      = document.getElementById('about-btn');
+const aboutOverlay  = document.getElementById('about-overlay');
+const aboutClose    = document.getElementById('about-close');
+aboutBtn .addEventListener('click', () => aboutOverlay.classList.add('open'));
+aboutClose.addEventListener('click', () => aboutOverlay.classList.remove('open'));
+aboutOverlay.addEventListener('click', (ev) => {
+  if (ev.target === aboutOverlay) aboutOverlay.classList.remove('open');
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && aboutOverlay.classList.contains('open')) aboutOverlay.classList.remove('open');
+});
+
+// ── 3-way preset toggle (Predetermined / Mixed / Kinetic) ──
+// Each preset sets η, σ, α sliders to canonical values that simulate the
+// named regime under the single Mixed-Dirichlet generator.  Sliders are NOT
+// greyed out — the user can move them freely after a preset.
+//
+//   Predetermined : η = 0      → k = 1 per child (strict tree).
+//                   α = 1      → irrelevant when k=1 (single-weight Dirichlet).
+//   Mixed         : η = 0.5    → half the parents per child active.
+//                   α = 1      → uniform-on-simplex weights over the active k.
+//   Kinetic       : η = 1      → every parent active (full graph).
+//                   α = 100    → weights ≈ 1/k (junction-pooled limit).
+const PRESETS = {
+  predetermined: { eta: 0.0, alphaLog: 0,  spread: 1.0 },
+  mixed:         { eta: 0.5, alphaLog: 0,  spread: 1.0 },
+  kinetic:       { eta: 1.0, alphaLog: 2,  spread: 1.0 },
+};
+function applyMode(mode) {
+  state.mode = mode;
+  [...modeToggle.querySelectorAll('button')].forEach(b => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+  });
+  const p = PRESETS[mode];
+  if (!p) return;
+  sEta.value   = p.eta;
+  sAlpha.value = p.alphaLog;
+  sSigma.value = p.spread;
+  // Propagate into state + display labels; then re-sample under the seed.
+  onDistributionChanged();
+}
+modeToggle.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-mode]');
+  if (!btn) return;
+  applyMode(btn.dataset.mode);
+});
+
+// ── Solver selector + λ slider ──
+function applySolver(name) {
+  state.solver = name;
+  if (blockLambda) blockLambda.style.display = SOLVERS_USING_LAMBDA.has(name) ? '' : 'none';
+  recompute();
+  render();
+}
+function onLambdaChanged() {
+  const logLam = parseFloat(sLambda.value);
+  state.lambda = Math.pow(10, logLam);
+  if (vLambda) vLambda.textContent = 'λ = ' + (state.lambda < 1e-3 ? state.lambda.toExponential(1) : state.lambda.toFixed(4));
+  recompute();
+  render();
+}
+solverSelect.addEventListener('change', () => applySolver(solverSelect.value));
+sLambda.addEventListener('input', onLambdaChanged);
+
+function drawProfileCanvas() {
+  const c = profileCanvas;
+  const dpr = window.devicePixelRatio || 1;
+  const r = c.getBoundingClientRect();
+  c.width = Math.max(80, r.width) * dpr;
+  c.height = Math.max(30, r.height) * dpr;
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = Math.max(80, r.width), H = Math.max(30, r.height);
+  ctx.clearRect(0, 0, W, H);
+  // axes
+  ctx.strokeStyle = '#8a7e66'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(4, H - 4); ctx.lineTo(W - 2, H - 4);
+  ctx.moveTo(4, H - 4); ctx.lineTo(4, 2); ctx.stroke();
+  // profile curve f(c) at scale 1 (relative)
+  ctx.strokeStyle = '#c56c2c'; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i++) {
+    const cf = i / 40;
+    const f = exportShapeValue(cf, state.exportProfile, state.exportNullFrac);
+    const x = 4 + (W - 8) * cf;
+    const y = (H - 4) - (H - 8) * Math.min(1, f);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  // dots at actual state completions
+  if (state.topology) {
+    const maxL = Math.max(1, ...state.topology.layers);
+    ctx.fillStyle = '#b08100';
+    for (const lv of state.topology.layers) {
+      const cf = lv / maxL;
+      const f = exportShapeValue(cf, state.exportProfile, state.exportNullFrac);
+      const x = 4 + (W - 8) * cf;
+      const y = (H - 4) - (H - 8) * Math.min(1, f);
+      ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCATTER PLOTS
+// ══════════════════════════════════════════════════════════════
+
+// Shared helper: pick nice tick values spanning [0, maxVal].
+function niceTicks(maxVal, n) {
+  if (!(maxVal > 0)) return [0, 1];
+  const raw = maxVal / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const ticks = [];
+  for (let v = 0; v <= maxVal * 1.0001; v += step) ticks.push(v);
+  if (ticks[ticks.length - 1] < maxVal) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+
+function setupCanvas(canvas, wMin, hMin) {
+  const dpr = window.devicePixelRatio || 1;
+  const r = canvas.getBoundingClientRect();
+  const W = Math.max(wMin, r.width);
+  const H = Math.max(hMin, r.height);
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, W, H };
+}
+
+function drawScatterAxes(ctx, W, H, pad, xMax, yMax, xLabel, yLabel) {
+  // plot area: [pad.l, W-pad.r] x [pad.t, H-pad.b]
+  const x0 = pad.l, x1 = W - pad.r, y0 = pad.t, y1 = H - pad.b;
+  // background
+  ctx.fillStyle = '#fbf8f1';
+  ctx.fillRect(0, 0, W, H);
+  // frame
+  ctx.strokeStyle = '#8a7e66';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  // ticks + grid
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = '#555';
+  ctx.strokeStyle = '#c9bfa8';
+  ctx.setLineDash([2, 3]);
+  const xt = niceTicks(xMax, 5);
+  for (const t of xt) {
+    const x = x0 + (t / Math.max(xMax, 1e-12)) * (x1 - x0);
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(formatTick(t, xMax), x, y1 + 2);
+  }
+  const yt = niceTicks(yMax, 5);
+  for (const t of yt) {
+    const y = y1 - (t / Math.max(yMax, 1e-12)) * (y1 - y0);
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    ctx.fillText(formatTick(t, yMax), x0 - 4, y);
+  }
+  ctx.setLineDash([]);
+  // axis labels
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = '11px -apple-system, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.fillText(xLabel, (x0 + x1) / 2, H - 2);
+  ctx.save();
+  ctx.translate(10, (y0 + y1) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+  return { x0, x1, y0, y1 };
+}
+
+function formatTick(v, maxV) {
+  if (v === 0) return '0';
+  if (maxV >= 100) return v.toFixed(0);
+  if (maxV >= 10)  return v.toFixed(1);
+  if (maxV >= 1)   return v.toFixed(2);
+  if (maxV >= 0.01) return v.toFixed(3);
+  return v.toExponential(1);
+}
+
+function drawDiagonal(ctx, box, vMax) {
+  // 1:1 diagonal line (identity), clipped to plot area
+  const { x0, x1, y0, y1 } = box;
+  ctx.strokeStyle = '#a89f88';
+  ctx.setLineDash([4, 4]);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  // the diagonal goes from (0,0) to (min(xMax,yMax), min(xMax,yMax))
+  ctx.moveTo(x0, y1);
+  ctx.lineTo(x1, y0);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// Shared point-drawing helper for the true-vs-recovered scatter.
+// includeMaskFn(k) -> boolean decides which edges get plotted.
+// Returns { n, r2 } for corner annotation.
+function drawRateScatter(canvasId, includeMaskFn) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const { ctx, W, H } = setupCanvas(canvas, 300, 240);
+  const pad = { l: 52, r: 14, t: 12, b: 38 };
+
+  const t = state.topology;
+  const pts = [];
+  for (let k = 0; k < t.nEdges; k++) {
+    if (!includeMaskFn(k)) continue;
+    pts.push({
+      tr: state.trueRates[k],
+      rc: state.recRates[k],
+      id: state.identScore[k] || 0,
+    });
+  }
+
+  let axMax = 0;
+  for (const p of pts) { if (p.tr > axMax) axMax = p.tr; if (p.rc > axMax) axMax = p.rc; }
+  if (!(axMax > 0)) axMax = 1;
+  axMax *= 1.08;
+
+  const box = drawScatterAxes(ctx, W, H, pad, axMax, axMax, 'True rate', 'Recovered rate');
+  drawDiagonal(ctx, box, axMax);
+
+  for (const p of pts) {
+    const x = box.x0 + (p.tr / axMax) * (box.x1 - box.x0);
+    const y = box.y1 - (p.rc / axMax) * (box.y1 - box.y0);
+    ctx.fillStyle = identColor(p.id);
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fbf8f1';
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+  }
+
+  // R² on exactly the edges we plotted (so the corner label matches the scatter)
+  const mask = [];
+  for (let k = 0; k < t.nEdges; k++) mask.push(includeMaskFn(k));
+  const r2 = r2Score(state.recRates, state.trueRates, mask);
+
+  ctx.fillStyle = '#555';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  const r2str = r2 === null ? 'N/A' : r2.toFixed(3);
+  ctx.fillText('n = ' + pts.length + '   R² = ' + r2str, box.x1 - 4, box.y0 + 4);
+}
+
+// Retained as a no-op so legacy call sites don't throw; the all-edges scatter
+// has been removed from the new layout.
+function drawScatterAllEdges() {}
+
+function drawScatterObservable() {
+  // Only edges with measurable endpoints — matches the diagnostics R².
+  drawRateScatter('scatter-obs-canvas', k => !!state.observable[k]);
+}
+
+function applyDADA() {
+  const val = dadaInput.value.trim().toUpperCase();
+  const sites = parseDADA(val);
+  if (sites.length < 2) {
+    dadaInput.classList.add('error');
+    document.getElementById('status').textContent = 'Need at least 1 donor and 1 acceptor';
+    return;
+  }
+  dadaInput.classList.remove('error');
+  state.dadaString = val;
+  state.seed = parseInt(seedInput.value, 10) || 1;
+  state.pinnedNodes.clear();
+  rebuild();
+}
+
+applyBtn.addEventListener('click', applyDADA);
+dadaInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyDADA(); });
+seedInput.addEventListener('change', () => {
+  state.seed = parseInt(seedInput.value, 10) || 1;
+  randomize();
+});
+randomizeBtn.addEventListener('click', () => {
+  // Advance the seed by 1 so each click is a fresh draw; keeps things
+  // reproducible relative to the base seed.
+  state.seed = (parseInt(seedInput.value, 10) || 1) + 1;
+  seedInput.value = state.seed;
+  randomize();
+});
+resetBtn.addEventListener('click', () => { state.pinnedNodes.clear(); resetRates(); });
+
+showRecBox.addEventListener('change', () => {
+  state.showRecovered = showRecBox.checked; renderDAG();
+});
+showIdentBox.addEventListener('change', () => {
+  state.showIdent = showIdentBox.checked;
+  recompute();
+  render();
+});
+// "Show all" is the inverse of the old "hide inactive/unobservable" knob.
+// Off (default) → only active, observable edges/nodes render (clean tree).
+// On → everything renders, including zero-rate edges — useful for manual
+// rate editing via click-to-edit on otherwise-hidden edges.
+showAllBox.addEventListener('change', () => {
+  state.hideUnobservable = !showAllBox.checked;
+  renderDAG();
+  renderTable();
+});
+
+// ── Priors sliders — η, σ, α, K ──
+function onDistributionChanged() {
+  state.eta    = parseFloat(sEta.value);
+  state.spread = parseFloat(sSigma.value);
+  const logA   = parseFloat(sAlpha.value);
+  state.alpha  = Math.pow(10, logA);
+  state.K      = parseFloat(sK.value);
+  vEta.textContent   = state.eta.toFixed(2);
+  vSigma.textContent = state.spread.toFixed(2);
+  vAlpha.textContent = 'α = ' + (state.alpha < 0.01 ? state.alpha.toExponential(1)
+                              : state.alpha < 1 ? state.alpha.toFixed(2)
+                              : state.alpha < 10 ? state.alpha.toFixed(1)
+                              : state.alpha.toFixed(0));
+  vK.textContent     = state.K.toFixed(2);
+
+  // Re-sample from the current seed so slider moves are reproducible.
+  randomize();
+}
+sEta   .addEventListener('input', onDistributionChanged);
+sSigma .addEventListener('input', onDistributionChanged);
+sAlpha .addEventListener('input', onDistributionChanged);
+sK     .addEventListener('input', onDistributionChanged);
+
+// ── Additional parameters — export profile, nullfrac, obs noise κ ──
+function onExportChanged() {
+  state.exportProfile  = profileSel.value;
+  state.exportNullFrac = parseFloat(sNullfrac.value);
+  vNullfrac.textContent = state.exportNullFrac.toFixed(2);
+  drawProfileCanvas();
+  recompute();
+  render();
+}
+profileSel.addEventListener('change', onExportChanged);
+sNullfrac .addEventListener('input', onExportChanged);
+
+function onKappaChanged() {
+  const kappa = parseFloat(sKappa.value);
+  state.kappa = kappa;
+  if (kappa < 0.05) {
+    vKappa.textContent = 'off';
+  } else {
+    vKappa.textContent = '10^' + kappa.toFixed(1);
+  }
+  recompute();
+  render();
+}
+sKappa.addEventListener('input', onKappaChanged);
+
+// Re-render layout pieces that depend on the container width when the window
+// resizes. The DAG relayouts via renderDAG() — no recompute needed.
+let _resizeT;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeT);
+  _resizeT = setTimeout(() => {
+    drawProfileCanvas();
+    drawScatterObservable();
+    if (state.topology) renderDAG();
+  }, 80);
+});
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+
+// Seed initial state from the DOM defaults.
+state.dadaString     = dadaInput.value;
+state.seed           = parseInt(seedInput.value, 10) || 42;
+state.mode           = 'mixed';
+state.eta            = parseFloat(sEta.value);
+state.spread         = parseFloat(sSigma.value);
+state.alpha          = Math.pow(10, parseFloat(sAlpha.value));
+state.K              = parseFloat(sK.value);
+state.solver         = solverSelect.value;
+state.solverMode     = solverModeSel ? solverModeSel.value : 'theta-aware';
+state.lambda         = Math.pow(10, parseFloat(sLambda.value));
+state.exportProfile  = profileSel.value;
+state.exportNullFrac = parseFloat(sNullfrac.value);
+state.kappa          = parseFloat(sKappa.value);
+
+// Sync display labels before first render.
+vEta.textContent   = state.eta.toFixed(2);
+vSigma.textContent = state.spread.toFixed(2);
+vAlpha.textContent = 'α = ' + (state.alpha < 1 ? state.alpha.toFixed(2) : state.alpha.toFixed(0));
+vK.textContent     = state.K.toFixed(2);
+vNullfrac.textContent = state.exportNullFrac.toFixed(2);
+vKappa.textContent    = state.kappa < 0.05 ? 'off' : '10^' + state.kappa.toFixed(1);
+vLambda.textContent   = 'λ = ' + (state.lambda < 1e-3 ? state.lambda.toExponential(1) : state.lambda.toFixed(4));
+if (blockLambda) blockLambda.style.display = SOLVERS_USING_LAMBDA.has(state.solver) ? '' : 'none';
+
+applyMode('mixed');
+rebuild();
+drawProfileCanvas();
+
+// ══════════════════════════════════════════════════════════════
+// ABOUT-MODAL WORKED EXAMPLE (§13)
+// ══════════════════════════════════════════════════════════════
+// Renders a fixed DADADA Mixed-preset example into the About modal, showing
+// the four solvers' rate recoveries as grouped horizontal bars. A λ slider
+// lets the reader watch junction-shrinkage interpolate between per-edge and
+// pooled in real time. The PRNG is reseeded to 2026 so the example is stable
+// every time the About modal opens.
+(function mountJshrinkExample() {
+  const svg = document.getElementById('jshrink-chart');
+  const slider = document.getElementById('jshrink-lambda');
+  const lamLabel = document.getElementById('jshrink-lambda-val');
+  const r2Row = document.getElementById('jshrink-r2-row');
+  if (!svg || !slider || !lamLabel || !r2Row) return;
+
+  // Freeze the scenario we're illustrating.
+  const SEED = 2026;
+  const DADA = 'DADADA';
+  const PRESET = { mode: 'mixed-dirichlet', sparsity: 0.5, spread: 1.0, alpha: 1.0 };
+  const topo = buildTopology(DADA);
+  const expArr = computeExportArray(topo, 1.0, 'power', 0.0);
+
+  // Ground-truth rates at the fixed seed.
+  const prevSeed = _rngState;                      // be a good citizen
+  setSeed(SEED);
+  const gen = generateRates(topo, PRESET);
+  _rngState = prevSeed;
+  const pTrue = forwardPredict(topo, gen.rates, expArr);
+  const obsMask = topo.edges.map(e => pTrue[e.src] > 1e-6 && pTrue[e.dst] > 1e-6);
+
+  // Solvers. Per-edge, pooled, and js are the interesting ones.
+  const perEdge = solveRates            (topo, pTrue, expArr, null);
+  const pooled  = solveRatesPooled      (topo, pTrue, expArr, null);
+  function jsSolver(lambda) { return solveRatesJunctionShrinkage(topo, pTrue, expArr, null, lambda); }
+
+  // Group edges by junction so the chart clusters them visually.
+  const junctionOrder = [];
+  const edgeToJunc = new Array(topo.nEdges);
+  const edgesByJunc = new Array(topo.nJunctions).fill(null).map(() => []);
+  topo.edges.forEach((e, k) => edgesByJunc[e.juncIdx].push(k));
+  let edgeOrder = [];
+  edgesByJunc.forEach((ks, j) => {
+    if (!ks.length) return;
+    junctionOrder.push(j);
+    ks.forEach(k => { edgeToJunc[k] = j; edgeOrder.push(k); });
+  });
+
+  // Fixed colour palette for junctions (cream-safe).
+  const JCOLORS = ['#1f4e79', '#2d7a4b', '#b08100', '#c56c2c', '#c73e5a', '#7a3fd6', '#a8475e', '#4a6b37'];
+  function jColor(j) { return JCOLORS[j % JCOLORS.length]; }
+
+  // R² helper (masked to observable edges with above-trace true rates).
+  function r2(rec) {
+    const maxTrue = Math.max.apply(null, gen.rates);
+    const TRACE = Math.max(1e-6, maxTrue * 1e-3);
+    const keep = [];
+    for (let k = 0; k < topo.nEdges; k++) {
+      if (!obsMask[k]) continue;
+      if (gen.rates[k] < TRACE) continue;
+      keep.push(k);
+    }
+    if (keep.length < 2) return null;
+    const t = keep.map(k => gen.rates[k]);
+    const r = keep.map(k => rec[k]);
+    const mean = t.reduce((s, v) => s + v, 0) / t.length;
+    let num = 0, den = 0;
+    for (let i = 0; i < keep.length; i++) { num += (r[i] - t[i]) ** 2; den += (t[i] - mean) ** 2; }
+    return den > 0 ? 1 - num / den : null;
+  }
+
+  function render() {
+    const logLam = parseFloat(slider.value);
+    const lam = Math.pow(10, logLam);
+    lamLabel.textContent = 'λ = ' + (lam < 1e-3 || lam > 1e3 ? lam.toExponential(1) : lam.toFixed(lam < 1 ? 4 : 2));
+
+    const js  = jsSolver(lam);
+    const series = [
+      { label: 'TRUTH',             rates: gen.rates,   color: '#1a1a1a' },
+      { label: 'per-edge NNLS',     rates: perEdge.rates, color: 'solver' },
+      { label: 'pooled NNLS',       rates: pooled.rates,  color: 'solver' },
+      { label: 'junction-shrink',   rates: js.rates,      color: 'solver' },
+    ];
+
+    // Layout
+    const W = 820, H = 240;
+    const padL = 130, padR = 20, padT = 18, padB = 30;
+    const plotW = W - padL - padR;
+    const plotH = H - padT - padB;
+    const rowH = plotH / series.length;
+    const nEdges = edgeOrder.length;
+    const barW = plotW / nEdges;
+    // Shared rate scale across series for direct comparison.
+    let maxR = 0;
+    for (const s of series) for (const r of s.rates) if (r > maxR) maxR = r;
+    maxR = maxR * 1.05 || 1;
+
+    let out = '';
+
+    // Axis / border
+    out += '<rect x="' + padL + '" y="' + padT + '" width="' + plotW + '" height="' + plotH + '" fill="transparent" stroke="#c9bfa8"/>';
+
+    // Horizontal row separators + labels
+    series.forEach((s, si) => {
+      const y0 = padT + si * rowH;
+      if (si > 0) out += '<line x1="' + padL + '" y1="' + y0 + '" x2="' + (padL + plotW) + '" y2="' + y0 + '" stroke="#c9bfa8" stroke-dasharray="2 3"/>';
+      out += '<text x="' + (padL - 8) + '" y="' + (y0 + rowH / 2 + 4) + '" text-anchor="end" font-size="11" font-family="Iowan Old Style, serif" fill="#1a1a1a" font-weight="700">' + s.label + '</text>';
+    });
+
+    // Bars
+    series.forEach((s, si) => {
+      const y0 = padT + si * rowH;
+      const ymax = y0 + rowH - 4;
+      edgeOrder.forEach((k, xi) => {
+        const x = padL + xi * barW + 1;
+        const h = Math.max(0, Math.min(rowH - 6, (s.rates[k] / maxR) * (rowH - 6)));
+        const y = ymax - h;
+        const col = s.color === 'solver' ? jColor(edgeToJunc[k]) : s.color;
+        out += '<rect x="' + x + '" y="' + y + '" width="' + Math.max(1, barW - 2) + '" height="' + h + '" fill="' + col + '" opacity="' + (s.rates[k] > 1e-8 ? 0.85 : 0.3) + '"/>';
+      });
+    });
+
+    // Junction separators along x-axis (between groups)
+    let xi = 0;
+    for (const j of junctionOrder) {
+      xi += edgesByJunc[j].length;
+      if (xi < nEdges) {
+        const x = padL + xi * barW;
+        out += '<line x1="' + x + '" y1="' + padT + '" x2="' + x + '" y2="' + (padT + plotH) + '" stroke="#b5a98e" stroke-width="0.5"/>';
+      }
+    }
+
+    // Legend along bottom — junction colour chips
+    let lx = padL;
+    for (const j of junctionOrder) {
+      const col = jColor(j);
+      const lbl = '(' + topo.junctions[j][0] + ',' + topo.junctions[j][1] + ')';
+      out += '<rect x="' + lx + '" y="' + (H - padB + 6) + '" width="10" height="10" fill="' + col + '"/>';
+      out += '<text x="' + (lx + 14) + '" y="' + (H - padB + 15) + '" font-size="10" font-family="Fira Code, monospace" fill="#555">' + lbl + '</text>';
+      lx += 58;
+    }
+
+    svg.innerHTML = out;
+
+    // R² row
+    const perEdgeR2 = r2(perEdge.rates);
+    const pooledR2  = r2(pooled.rates);
+    const jsR2      = r2(js.rates);
+    function fmt(x) { return x == null ? 'N/A' : x.toFixed(3); }
+    r2Row.innerHTML =
+      '<span><b style="color:#1a1a1a">per-edge:</b> R² = ' + fmt(perEdgeR2) + '</span>' +
+      '<span><b style="color:#1a1a1a">pooled:</b> R² = ' + fmt(pooledR2) + '</span>' +
+      '<span><b style="color:#1a1a1a">junction-shrink (λ above):</b> R² = ' + fmt(jsR2) + '</span>';
+  }
+  slider.addEventListener('input', render);
+  render();
+})();
+</script>
+</body>
+</html>

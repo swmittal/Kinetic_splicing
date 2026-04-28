@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R² landscape — oracle vs naive on the (η, σ, log α) cube</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous"
+  onload="renderMathInElement(document.body, {delimiters: [
+    {left: '$$', right: '$$', display: true},
+    {left: '$',  right: '$',  display: false}
+  ], throwOnError: false});"></script>
+
+<style>
+:root {
+  --bg: #fbf8f1;
+  --bg-soft: #f4ecd8;
+  --bg-card: #fffef9;
+  --ink: #2a221a;
+  --ink-soft: #5a4a3a;
+  --rule: #c9bfa8;
+  --accent: #7a4b2b;
+  --accent2: #2c5d6b;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+  font-family: 'Iowan Old Style', Georgia, serif; }
+main { max-width: 1200px; margin: 24px auto 60px; padding: 0 24px; }
+h1 { color: var(--accent); margin-bottom: 0.1em; }
+h1 .small { display: block; font-size: 0.55em; color: var(--ink-soft); font-weight: 400; font-style: italic; margin-top: 0.4em; }
+h2 { color: var(--accent2); font-variant: small-caps; letter-spacing: 0.05em; margin-top: 1.4em; }
+p, li { line-height: 1.55; }
+.controls {
+  background: var(--bg-soft); border: 1px solid var(--rule);
+  border-radius: 6px; padding: 12px 18px; margin: 14px 0;
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+}
+.controls label { font-size: 13px; color: var(--ink-soft); margin-right: 6px; }
+.controls select, .controls input[type=number] {
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 4px;
+  padding: 4px 8px; font-family: 'Fira Code', monospace; font-size: 13px; color: var(--ink);
+}
+.controls button {
+  background: var(--accent); color: var(--bg); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 6px 14px; font-family: inherit;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+}
+.controls button:hover { background: var(--accent2); border-color: var(--accent2); }
+.progress { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; margin: 8px 0; }
+.progress .bar { height: 100%; background: var(--accent2); width: 0%; transition: width 0.15s; }
+.lambda-row {
+  background: var(--bg-soft); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 12px 18px; margin: 14px 0; display: flex; align-items: center; gap: 18px;
+}
+.lambda-row .tag {
+  font-family: 'Iowan Old Style', serif; font-weight: 700; color: var(--accent);
+  font-size: 14px; font-variant: small-caps; letter-spacing: 0.08em;
+}
+.lambda-row input[type=range] { flex: 1; accent-color: var(--accent); }
+.lambda-row .val {
+  font-family: 'Fira Code', monospace; font-size: 14px;
+  color: var(--accent2); font-weight: 700; min-width: 130px; text-align: right;
+}
+.summary {
+  background: var(--bg-soft); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 12px 16px; margin: 14px 0;
+  font-family: 'Fira Code', monospace; font-size: 13px;
+}
+.summary .h {
+  font-variant: small-caps; letter-spacing: 0.08em;
+  color: var(--accent); font-weight: 700; margin-bottom: 6px;
+}
+.three-d-panel { background: var(--bg-soft); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; margin: 18px 0; }
+.three-d-panel h3 { margin: 0 0 6px; color: var(--accent2); font-variant: small-caps; letter-spacing: 0.08em; font-size: 14px; }
+#cube-canvas {
+  display: block; width: 100%; height: 440px;
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; cursor: grab;
+}
+#cube-canvas:active { cursor: grabbing; }
+.cutoff-row {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 10px; font-size: 12px; color: var(--ink-soft);
+}
+.cutoff-row input[type=range] { flex: 1; accent-color: var(--accent2); }
+.cutoff-row .val {
+  font-family: 'Fira Code', monospace; font-weight: 700; color: var(--accent);
+  font-size: 12px; min-width: 80px; text-align: right;
+}
+.slice-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; margin: 20px 0; }
+.panel { background: var(--bg-soft); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; }
+.panel h3 { margin: 0 0 6px; color: var(--accent2); font-variant: small-caps; letter-spacing: 0.08em; font-size: 13.5px; }
+.panel canvas {
+  display: block; width: 100%; height: 240px;
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 4px;
+}
+.panel .slider-line { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--ink-soft); }
+.panel .slider-line input[type=range] { flex: 1; accent-color: var(--accent2); }
+.panel .slider-line .val { font-family: 'Fira Code', monospace; font-weight: 700; color: var(--accent); font-size: 12px; min-width: 80px; text-align: right; }
+.cbar { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; color: var(--ink-soft); font-family: 'Fira Code', monospace; }
+.cbar canvas { height: 14px; width: 220px; border: 1px solid var(--rule); border-radius: 2px; flex: 0 0 auto; }
+</style>
+</head>
+
+<body>
+<main>
+
+<h1>R² landscape on (η, σ, log α)
+  <span class="small">naive vs oracle, three solvers, single noiseless IPD</span>
+</h1>
+
+<p>
+  At each cell of the (η, σ, log α) grid we draw <code>n_seeds</code> samples from the Mixed-Dirichlet generator, forward-solve the CTMC for the noiseless IPD, then run NNLS to recover rates. The reported R² is the mean over seeds.
+</p>
+<ul>
+  <li><b>Mode</b> — <em>naive</em> runs NNLS over the full DADA edge set; <em>oracle</em> hands the truth's active mask to the solver and runs NNLS only on those columns.</li>
+  <li><b>Solver</b> — per-edge NNLS, pooled (per-junction) NNLS, or junction-shrinkage NNLS at the chosen λ.</li>
+  <li><b>R²</b> is computed on observable, above-trace edges. Negative values clip to 0 in the colour map.</li>
+</ul>
+
+<div class="controls">
+  <div>
+    <label>DADA</label>
+    <select id="dada-sel">
+      <option value="DADA">DADA  (5 states, 5 edges)</option>
+      <option value="DADADA" selected>DADADA  (13 states, 19 edges)</option>
+    </select>
+  </div>
+  <div>
+    <label>Grid N</label>
+    <input id="grid-n" type="number" min="5" max="13" step="1" value="9" style="width:60px">
+  </div>
+  <div>
+    <label>Seeds / cell</label>
+    <input id="seeds-n" type="number" min="1" max="40" step="1" value="10" style="width:60px">
+  </div>
+  <div>
+    <label>Solver</label>
+    <select id="solver-sel">
+      <option value="js" selected>Junction-shrinkage</option>
+      <option value="pe">Per-edge</option>
+      <option value="pl">Pooled</option>
+    </select>
+  </div>
+  <div>
+    <label style="margin-right:6px">Mode</label>
+    <label style="margin-right:10px;cursor:pointer"><input type="radio" name="mode" value="naive" checked> naive</label>
+    <label style="cursor:pointer"><input type="radio" name="mode" value="oracle"> oracle (mask known)</label>
+  </div>
+  <button id="run-btn">Re-compute cube</button>
+</div>
+
+<div class="progress"><div class="bar" id="progress-bar"></div></div>
+<div id="status" style="font-family:'Fira Code',monospace;font-size:12px;color:var(--ink-soft);min-height:16px"></div>
+
+<div class="lambda-row" id="lambda-row">
+  <span class="tag">λ (shrinkage)</span>
+  <input id="lambda-slider" type="range" min="-6" max="4" step="0.1" value="-4">
+  <span class="val" id="lambda-val">λ = 1e-4</span>
+</div>
+
+<div class="summary">
+  <div class="h" id="summary-title">E[R²] over (η, σ, α)</div>
+  <div id="summary-line" style="color:var(--ink-soft)">Cube not yet computed.</div>
+</div>
+
+<div class="three-d-panel">
+  <h3>3D landscape — R²(η, σ, log₁₀α)</h3>
+  <canvas id="cube-canvas"></canvas>
+  <div class="cutoff-row">
+    <label>Hide cells with R² &lt;</label>
+    <input id="cutoff-slider" type="range" min="0" max="1" step="0.02" value="0">
+    <span class="val" id="cutoff-val">0.00</span>
+    <label style="margin-left:auto;display:inline-flex;align-items:center;gap:6px"><input id="show-axes" type="checkbox" checked> show axes/labels</label>
+  </div>
+</div>
+
+<div class="slice-grid">
+  <div class="panel">
+    <h3>η × σ  (α fixed)</h3>
+    <canvas id="heat-es"></canvas>
+    <div class="slider-line">
+      <label>fixed log₁₀α</label>
+      <input id="slider-alpha" type="range" min="0" max="0" step="1" value="0">
+      <span class="val" id="alpha-val">0.0</span>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>η × log₁₀α  (σ fixed)</h3>
+    <canvas id="heat-ea"></canvas>
+    <div class="slider-line">
+      <label>fixed σ</label>
+      <input id="slider-sigma" type="range" min="0" max="0" step="1" value="0">
+      <span class="val" id="sigma-val">1.00</span>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>σ × log₁₀α  (η fixed)</h3>
+    <canvas id="heat-sa"></canvas>
+    <div class="slider-line">
+      <label>fixed η</label>
+      <input id="slider-eta" type="range" min="0" max="0" step="1" value="0">
+      <span class="val" id="eta-val">0.5</span>
+    </div>
+  </div>
+</div>
+
+<div class="cbar">
+  <span>R² colour scale (clipped to [0, 1]):</span>
+  <canvas id="cbar-canvas" height="14" width="220"></canvas>
+  <span>0</span><span style="flex:1"></span><span>1</span>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────
+// Mulberry32 RNG + Box-Muller normal + Marsaglia gamma
+// ─────────────────────────────────────────────────────────────────────
+let _rng = 42;
+function setSeed(s) { _rng = (s >>> 0) || 1; }
+function rng() {
+  _rng = (_rng + 0x6D2B79F5) >>> 0;
+  let t = _rng;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function normalRandom() {
+  let u, v, s;
+  do { u = rng() * 2 - 1; v = rng() * 2 - 1; s = u*u + v*v; } while (s >= 1 || s === 0);
+  return u * Math.sqrt(-2 * Math.log(s) / s);
+}
+function gammaRandom(shape) {
+  if (shape < 1) return gammaRandom(shape + 1) * Math.pow(rng() || 1e-12, 1 / shape);
+  const d = shape - 1 / 3, c = 1 / Math.sqrt(9 * d);
+  while (true) {
+    let x, v;
+    do { x = normalRandom(); v = 1 + c * x; } while (v <= 0);
+    v = v * v * v;
+    const u = rng();
+    if (u < 1 - 0.0331 * x * x * x * x) return d * v;
+    if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Topology
+// ─────────────────────────────────────────────────────────────────────
+const RATE_SCALE = 75;
+function parseDADA(s) { const a = []; for (const c of s.toUpperCase()) if (c === 'D' || c === 'A') a.push(c); return a; }
+function junctionsCompatible(j1, j2) {
+  if (j1[0] === j2[0] || j1[1] === j2[1]) return false;
+  return j1[1] <= j2[0] || j2[1] <= j1[0];
+}
+function buildTopology(s) {
+  const sites = parseDADA(s);
+  const junctions = [];
+  for (let i = 0; i < sites.length; i++) if (sites[i] === 'D')
+    for (let j = i + 1; j < sites.length; j++) if (sites[j] === 'A') junctions.push([i, j]);
+  const key = x => [...x].sort((a,b)=>a-b).join(',');
+  const states = [new Set()];
+  const map = new Map([[key(new Set()), 0]]);
+  const queue = [0];
+  const edges = [];
+  while (queue.length) {
+    const si = queue.shift();
+    const st = states[si];
+    for (let ji = 0; ji < junctions.length; ji++) {
+      if (st.has(ji)) continue;
+      let ok = true;
+      for (const ex of st) if (!junctionsCompatible(junctions[ex], junctions[ji])) { ok = false; break; }
+      if (!ok) continue;
+      const ns = new Set(st); ns.add(ji);
+      const nk = key(ns);
+      let di;
+      if (map.has(nk)) di = map.get(nk);
+      else { di = states.length; states.push(ns); map.set(nk, di); queue.push(di); }
+      edges.push({ src: si, dst: di, juncIdx: ji });
+    }
+  }
+  const layers = states.map(s => s.size);
+  return { sites, junctions, nJunctions: junctions.length, nStates: states.length, edges, nEdges: edges.length, layers };
+}
+
+function exportShapeValue(c) { return c * c; }   // power-law
+function computeExportArray(t) {
+  const maxL = Math.max(1, ...t.layers);
+  return t.layers.map(l => exportShapeValue((maxL > 0 ? l / maxL : 0)));
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Mixed-Dirichlet generator
+// ─────────────────────────────────────────────────────────────────────
+function generateMixedDirichlet(t, params) {
+  const { edges, nEdges, nStates, nJunctions } = t;
+  const { eta, alpha, sigma } = params;
+  const incoming = new Array(nStates);
+  for (let i = 0; i < nStates; i++) incoming[i] = [];
+  for (let k = 0; k < nEdges; k++) incoming[edges[k].dst].push(k);
+  const juncAmp = new Array(nJunctions);
+  for (let j = 0; j < nJunctions; j++)
+    juncAmp[j] = (sigma < 0.01) ? RATE_SCALE : Math.max(0.001, RATE_SCALE * Math.exp(sigma * normalRandom()));
+  const rates = new Array(nEdges).fill(0);
+  for (let i = 1; i < nStates; i++) {
+    const inc = incoming[i];
+    const m = inc.length;
+    if (!m) continue;
+    const k = Math.max(1, Math.min(m, Math.round(eta * m)));
+    const idx = inc.map((_, r) => r);
+    for (let j = 0; j < k; j++) {
+      const pick = j + Math.floor(rng() * (idx.length - j));
+      const tmp = idx[j]; idx[j] = idx[pick]; idx[pick] = tmp;
+    }
+    const keep = idx.slice(0, k);
+    const g = keep.map(() => gammaRandom(Math.max(1e-3, alpha)));
+    let total = 0; for (const v of g) total += v; if (total <= 0) total = 1;
+    for (let j = 0; j < keep.length; j++) {
+      const ek = inc[keep[j]];
+      rates[ek] = juncAmp[edges[ek].juncIdx] * (k * g[j] / total);
+    }
+  }
+  const activeMask = rates.map(r => r > 0);
+  return { rates, activeMask };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Linear algebra: Gauss elimination, NNLS, balance, Helmert
+// ─────────────────────────────────────────────────────────────────────
+function gaussSolve(A, b) {
+  const n = A.length;
+  const M = A.map((row, i) => row.concat([b[i]]));
+  for (let col = 0; col < n; col++) {
+    let mv = Math.abs(M[col][col]), mr = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > mv) { mv = Math.abs(M[r][col]); mr = r; }
+    [M[col], M[mr]] = [M[mr], M[col]];
+    if (Math.abs(M[col][col]) < 1e-15) continue;
+    for (let r = col + 1; r < n; r++) {
+      const f = M[r][col] / M[col][col];
+      for (let j = col; j <= n; j++) M[r][j] -= f * M[col][j];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    if (Math.abs(M[i][i]) < 1e-15) continue;
+    x[i] = M[i][n];
+    for (let j = i + 1; j < n; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= M[i][i];
+  }
+  return x;
+}
+
+function forwardPredict(t, rates, expArr) {
+  const { edges, nStates } = t;
+  const Q = []; for (let i = 0; i < nStates; i++) { Q[i] = new Array(nStates).fill(0); Q[i][i] = -expArr[i]; }
+  for (let k = 0; k < edges.length; k++) {
+    const r = rates[k]; const s = edges[k].src, d = edges[k].dst;
+    Q[s][s] -= r; Q[d][s] += r;
+  }
+  const b = new Array(nStates).fill(0); b[0] = -1;
+  const M = Q.map((row, i) => row.concat([b[i]]));
+  const n = nStates;
+  for (let col = 0; col < n; col++) {
+    let mv = Math.abs(M[col][col]), mr = col;
+    for (let r = col + 1; r < n; r++) if (Math.abs(M[r][col]) > mv) { mv = Math.abs(M[r][col]); mr = r; }
+    [M[col], M[mr]] = [M[mr], M[col]];
+    if (Math.abs(M[col][col]) < 1e-15) continue;
+    for (let r = col + 1; r < n; r++) {
+      const f = M[r][col] / M[col][col];
+      for (let j = col; j <= n; j++) M[r][j] -= f * M[col][j];
+    }
+  }
+  const p = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    if (Math.abs(M[i][i]) < 1e-15) continue;
+    p[i] = M[i][n];
+    for (let j = i + 1; j < n; j++) p[i] -= M[i][j] * p[j];
+    p[i] /= M[i][i];
+  }
+  for (let i = 0; i < n; i++) if (p[i] < 0) p[i] = 0;
+  let s = 0; for (const v of p) s += v; if (s > 0) for (let i = 0; i < n; i++) p[i] /= s;
+  return p;
+}
+
+function nnls(A, b) {
+  const m = A.length, n = A[0].length;
+  const x = new Array(n).fill(0);
+  const P = {}, Z = {};
+  for (let i = 0; i < n; i++) Z[i] = true;
+  const maxIter = 3 * n + 30;
+  for (let iter = 0; iter < maxIter; iter++) {
+    const Ax = new Array(m).fill(0);
+    for (let i = 0; i < m; i++) for (let j = 0; j < n; j++) Ax[i] += A[i][j] * x[j];
+    const w = new Array(n).fill(0);
+    for (let j = 0; j < n; j++) for (let i = 0; i < m; i++) w[j] += A[i][j] * (b[i] - Ax[i]);
+    let mW = -1e30, t = -1;
+    for (const jj in Z) { const jv = +jj; if (w[jv] > mW) { mW = w[jv]; t = jv; } }
+    if (mW <= 1e-10 || t < 0) break;
+    delete Z[t]; P[t] = true;
+    for (let inner = 0; inner < maxIter; inner++) {
+      const pI = Object.keys(P).map(Number);
+      const np = pI.length;
+      const AtA = [];
+      for (let pi = 0; pi < np; pi++) {
+        AtA[pi] = new Array(np).fill(0);
+        for (let pj = 0; pj < np; pj++) for (let i = 0; i < m; i++) AtA[pi][pj] += A[i][pI[pi]] * A[i][pI[pj]];
+      }
+      const Atb = new Array(np).fill(0);
+      for (let pi = 0; pi < np; pi++) for (let i = 0; i < m; i++) Atb[pi] += A[i][pI[pi]] * b[i];
+      const sp = gaussSolve(AtA, Atb);
+      let ok = true;
+      for (let pi = 0; pi < np; pi++) if (sp[pi] < -1e-15) { ok = false; break; }
+      if (ok) {
+        for (let pi = 0; pi < np; pi++) x[pI[pi]] = Math.max(0, sp[pi]);
+        for (const jj in Z) x[+jj] = 0;
+        break;
+      }
+      let al = 1e30;
+      for (let pi = 0; pi < np; pi++) if (sp[pi] < -1e-15) {
+        const a2 = x[pI[pi]] / (x[pI[pi]] - sp[pi]);
+        if (a2 < al) al = a2;
+      }
+      for (let pi = 0; pi < np; pi++) x[pI[pi]] += al * (sp[pi] - x[pI[pi]]);
+      for (const jj in Z) x[+jj] = 0;
+      const tm = [];
+      for (const jj in P) { const jv = +jj; if (Math.abs(x[jv]) < 1e-12) tm.push(jv); }
+      for (const jv of tm) { delete P[jv]; Z[jv] = true; x[jv] = 0; }
+    }
+  }
+  return x;
+}
+
+function buildBalance(t, p, expArr, mask) {
+  const { edges, nStates } = t;
+  const useRows = [];
+  for (let i = 1; i < nStates; i++) if (p[i] > 1e-14) useRows.push(i);
+  const usable = [];
+  for (let k = 0; k < edges.length; k++) {
+    if (mask && !mask[k]) continue;
+    if (p[edges[k].src] > 1e-14) usable.push(k);
+  }
+  const nR = useRows.length, nC = usable.length;
+  const rowMap = {}; useRows.forEach((i, idx) => rowMap[i] = idx);
+  const A = []; for (let i = 0; i < nR; i++) A[i] = new Array(nC).fill(0);
+  usable.forEach((k, ci) => {
+    const s = edges[k].src, d = edges[k].dst;
+    if (rowMap[d] !== undefined) A[rowMap[d]][ci] += p[s];
+    if (rowMap[s] !== undefined) A[rowMap[s]][ci] -= p[s];
+  });
+  const c = useRows.map(i => expArr[i] * p[i]);
+  return { A, c, usable, nR, nC };
+}
+
+function helmertRows(n) {
+  const rows = [];
+  for (let i = 1; i < n; i++) {
+    const d = Math.sqrt(i * (i + 1));
+    const row = new Array(n).fill(0);
+    for (let j = 0; j < i; j++) row[j] = 1 / d;
+    row[i] = -i / d;
+    rows.push(row);
+  }
+  return rows;
+}
+
+function solvePerEdge(t, p, expArr, mask) {
+  const sys = buildBalance(t, p, expArr, mask);
+  if (sys.nR === 0 || sys.nC === 0) return new Array(t.edges.length).fill(0);
+  const x = nnls(sys.A, sys.c);
+  const rates = new Array(t.edges.length).fill(0);
+  sys.usable.forEach((k, ci) => { rates[k] = x[ci]; });
+  return rates;
+}
+
+function solvePooled(t, p, expArr, mask) {
+  const sys = buildBalance(t, p, expArr, mask);
+  if (sys.nR === 0 || sys.nC === 0) return new Array(t.edges.length).fill(0);
+  const { edges, nJunctions } = t;
+  const juncCols = new Array(nJunctions); for (let j = 0; j < nJunctions; j++) juncCols[j] = [];
+  sys.usable.forEach((k, ci) => juncCols[edges[k].juncIdx].push(ci));
+  const live = []; for (let j = 0; j < nJunctions; j++) if (juncCols[j].length) live.push(j);
+  const Apool = [];
+  for (let i = 0; i < sys.nR; i++) {
+    const row = new Array(live.length).fill(0);
+    for (let lj = 0; lj < live.length; lj++) for (const ci of juncCols[live[lj]]) row[lj] += sys.A[i][ci];
+    Apool.push(row);
+  }
+  const rho = nnls(Apool, sys.c);
+  const rates = new Array(t.edges.length).fill(0);
+  for (let lj = 0; lj < live.length; lj++) {
+    const each = rho[lj];
+    for (const ci of juncCols[live[lj]]) rates[sys.usable[ci]] = each;
+  }
+  return rates;
+}
+
+function solveJunctionShrinkage(t, p, expArr, lambda, mask) {
+  const sys = buildBalance(t, p, expArr, mask);
+  if (sys.nR === 0 || sys.nC === 0) return new Array(t.edges.length).fill(0);
+  const { edges, nJunctions } = t;
+  const sqrtL = Math.sqrt(Math.max(0, lambda));
+  const juncCols = new Array(nJunctions); for (let j = 0; j < nJunctions; j++) juncCols[j] = [];
+  sys.usable.forEach((k, ci) => juncCols[edges[k].juncIdx].push(ci));
+  const Aaug = []; for (let i = 0; i < sys.nR; i++) Aaug.push(sys.A[i].slice());
+  for (let j = 0; j < nJunctions; j++) {
+    const cols = juncCols[j]; if (cols.length < 2) continue;
+    const H = helmertRows(cols.length);
+    for (const h of H) {
+      const row = new Array(sys.nC).fill(0);
+      for (let k = 0; k < cols.length; k++) row[cols[k]] = sqrtL * h[k];
+      Aaug.push(row);
+    }
+  }
+  const caug = sys.c.concat(new Array(Aaug.length - sys.nR).fill(0));
+  const x = nnls(Aaug, caug);
+  const rates = new Array(t.edges.length).fill(0);
+  sys.usable.forEach((k, ci) => { rates[k] = x[ci]; });
+  return rates;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// R² metric
+// ─────────────────────────────────────────────────────────────────────
+function r2(rec, tru, pTrue, edges) {
+  const maxTrue = Math.max.apply(null, tru.concat([0]));
+  const TRACE = Math.max(1e-6, maxTrue * 1e-3);
+  const maxP = Math.max.apply(null, pTrue);
+  const OBS = Math.max(1e-12, maxP * 1e-4);
+  const keep = [];
+  for (let k = 0; k < edges.length; k++) {
+    if (pTrue[edges[k].src] <= OBS || pTrue[edges[k].dst] <= OBS) continue;
+    if (tru[k] <= TRACE) continue;
+    keep.push(k);
+  }
+  if (keep.length < 2) return null;
+  const t = keep.map(k => tru[k]);
+  const r = keep.map(k => rec[k]);
+  const mean = t.reduce((s, v) => s + v, 0) / t.length;
+  let num = 0, den = 0;
+  for (let i = 0; i < keep.length; i++) { num += (r[i] - t[i]) ** 2; den += (t[i] - mean) ** 2; }
+  return den > 0 ? 1 - num / den : null;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Cube cache + sweep (compute once, score-on-demand)
+// ─────────────────────────────────────────────────────────────────────
+let cube = null, etas = [], sigmas = [], alphaLogs = [], topo = null, expArr = null;
+let _lastVol = null;
+
+async function computeCube() {
+  const dadaStr = document.getElementById('dada-sel').value;
+  const N = Math.max(2, parseInt(document.getElementById('grid-n').value, 10));
+  const S = Math.max(1, parseInt(document.getElementById('seeds-n').value, 10));
+  const status = document.getElementById('status');
+  const pbar = document.getElementById('progress-bar');
+  topo = buildTopology(dadaStr);
+  expArr = computeExportArray(topo);
+  status.textContent = `${dadaStr}: ${topo.nStates} states, ${topo.nEdges} edges, ${topo.nJunctions} junctions — building cube…`;
+
+  etas = []; sigmas = []; alphaLogs = [];
+  for (let i = 0; i < N; i++) {
+    etas.push(i / (N - 1));
+    sigmas.push(2.5 * i / (N - 1));
+    alphaLogs.push(-2 + 4 * i / (N - 1));
+  }
+  for (const id of ['slider-alpha', 'slider-sigma', 'slider-eta']) {
+    const el = document.getElementById(id);
+    el.max = N - 1;
+    if (parseInt(el.value, 10) > N - 1) el.value = Math.floor(N / 2);
+  }
+
+  cube = new Array(N);
+  for (let i = 0; i < N; i++) {
+    cube[i] = new Array(N);
+    for (let j = 0; j < N; j++) {
+      cube[i][j] = new Array(N);
+      for (let k = 0; k < N; k++) cube[i][j][k] = { samples: [] };
+    }
+  }
+
+  const totalCells = N * N * N * S;
+  let done = 0;
+  for (let i = 0; i < N; i++) {
+    const eta = etas[i];
+    for (let j = 0; j < N; j++) {
+      const sigma = sigmas[j];
+      for (let k = 0; k < N; k++) {
+        const alpha = Math.pow(10, alphaLogs[k]);
+        for (let s = 0; s < S; s++) {
+          setSeed(2026 + 997 * i + 331 * j + 113 * k + s);
+          const gen = generateMixedDirichlet(topo, { eta, alpha, sigma });
+          const p = forwardPredict(topo, gen.rates, expArr);
+          cube[i][j][k].samples.push({ rates: gen.rates, p, activeMask: gen.activeMask });
+        }
+        done += S;
+      }
+      pbar.style.width = (100 * done / totalCells).toFixed(1) + '%';
+      status.textContent = `Building cube: ${done} / ${totalCells} samples`;
+    }
+    await new Promise(r => setTimeout(r, 0));
+  }
+  pbar.style.width = '100%';
+  status.textContent = `Cube ready: ${N}³ = ${N*N*N} cells × ${S} seeds = ${totalCells} cached samples.`;
+  renderAll();
+}
+
+function cellR2(cell, lambda, useOracle, solver) {
+  if (!cell.samples.length) return NaN;
+  let sum = 0, n = 0;
+  for (const s of cell.samples) {
+    const mask = useOracle ? s.activeMask : null;
+    let rec;
+    if (solver === 'pe') rec = solvePerEdge(topo, s.p, expArr, mask);
+    else if (solver === 'pl') rec = solvePooled(topo, s.p, expArr, mask);
+    else rec = solveJunctionShrinkage(topo, s.p, expArr, lambda, mask);
+    const v = r2(rec, s.rates, s.p, topo.edges);
+    if (v !== null && isFinite(v)) { sum += v; n++; }
+  }
+  return n > 0 ? sum / n : NaN;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Colours + heatmap
+// ─────────────────────────────────────────────────────────────────────
+function viridis(t) {
+  t = Math.max(0, Math.min(1, t));
+  const stops = [
+    [0.0, [68,1,84]], [0.25,[59,82,139]], [0.5,[33,145,140]], [0.75,[94,201,98]], [1.0,[253,231,37]],
+  ];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t <= stops[i+1][0]) {
+      const u = (t - stops[i][0]) / (stops[i+1][0] - stops[i][0]);
+      const rgb = [0,1,2].map(c => stops[i][1][c] + u * (stops[i+1][1][c] - stops[i][1][c]));
+      return `rgb(${Math.round(rgb[0])},${Math.round(rgb[1])},${Math.round(rgb[2])})`;
+    }
+  }
+  return 'rgb(253,231,37)';
+}
+function drawColourbar() {
+  const c = document.getElementById('cbar-canvas');
+  const ctx = c.getContext('2d');
+  for (let x = 0; x < c.width; x++) { ctx.fillStyle = viridis(x / (c.width - 1)); ctx.fillRect(x, 0, 1, c.height); }
+}
+
+function drawHeatmap(canvasId, grid, xs, ys, xLabel, yLabel) {
+  const c = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  c.width = rect.width * dpr; c.height = rect.height * dpr;
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W = rect.width, H = rect.height;
+  const padL = 42, padR = 8, padT = 8, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const nx = xs.length, ny = ys.length;
+  const cw = plotW / nx, ch = plotH / ny;
+  ctx.fillStyle = '#fbf8f1'; ctx.fillRect(0, 0, W, H);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const v = grid[j][i]; const tv = isFinite(v) ? Math.max(0, Math.min(1, v)) : 0;
+    ctx.fillStyle = viridis(tv);
+    const y = padT + (ny - 1 - j) * ch;
+    ctx.fillRect(padL + i * cw, y, cw + 0.5, ch + 0.5);
+  }
+  ctx.strokeStyle = '#c9bfa8'; ctx.strokeRect(padL, padT, plotW, plotH);
+  ctx.fillStyle = '#1a1a1a'; ctx.font = '11px Fira Code, monospace'; ctx.textAlign = 'center';
+  for (let i = 0; i < nx; i += Math.max(1, Math.ceil(nx / 6)))
+    ctx.fillText(xs[i].toFixed(1), padL + (i + 0.5) * cw, padT + plotH + 14);
+  ctx.fillText(xLabel, padL + plotW / 2, padT + plotH + 28);
+  ctx.save(); ctx.translate(padL - 32, padT + plotH / 2); ctx.rotate(-Math.PI / 2);
+  ctx.fillText(yLabel, 0, 0); ctx.restore();
+  ctx.textAlign = 'right';
+  for (let j = 0; j < ny; j += Math.max(1, Math.ceil(ny / 6))) {
+    const y = padT + (ny - 1 - j) * ch + ch / 2 + 4;
+    ctx.fillText(ys[j].toFixed(1), padL - 4, y);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 3D cube renderer
+// ─────────────────────────────────────────────────────────────────────
+const cam = { yaw: 0.55, pitch: 0.45, zoom: 1.0 };
+function projectPoint(p, W, H) {
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const x1 = cy * p.x + sy * p.z, z1 = -sy * p.x + cy * p.z;
+  const y2 = cp * p.y - sp * z1, z2 = sp * p.y + cp * z1;
+  const s = 0.86 * cam.zoom;
+  const sx = W / 2 + s * Math.min(W, H) * 0.48 * x1;
+  const scy = H / 2 - s * Math.min(W, H) * 0.48 * y2;
+  return { sx, sy: scy, depth: z2 };
+}
+
+function renderCube3D() {
+  const vol = _lastVol; const c = document.getElementById('cube-canvas');
+  if (!c || !vol) return;
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  c.width = rect.width * dpr; c.height = rect.height * dpr;
+  const ctx = c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  const W = rect.width, H = rect.height;
+  ctx.fillStyle = '#fbf8f1'; ctx.fillRect(0, 0, W, H);
+  const cutoff = parseFloat(document.getElementById('cutoff-slider').value);
+  document.getElementById('cutoff-val').textContent = cutoff.toFixed(2);
+  const showAxes = document.getElementById('show-axes').checked;
+  const N = vol.length;
+  const pts = [];
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
+    const v = vol[i][j][k];
+    if (!isFinite(v) || v < cutoff) continue;
+    const x = (i / (N - 1)) * 2 - 1;
+    const y = (j / (N - 1)) * 2 - 1;
+    const z = (k / (N - 1)) * 2 - 1;
+    const pr = projectPoint({ x, y, z }, W, H);
+    pts.push({ sx: pr.sx, sy: pr.sy, depth: pr.depth, v });
+  }
+  if (showAxes) {
+    ctx.strokeStyle = '#c9bfa8'; ctx.lineWidth = 1;
+    const axes = [
+      { a: { x:-1, y:-1, z:-1 }, b: { x:1, y:-1, z:-1 }, lbl: 'η',       lblAt: { x:1.15, y:-1, z:-1 } },
+      { a: { x:-1, y:-1, z:-1 }, b: { x:-1, y:1, z:-1 }, lbl: 'σ',       lblAt: { x:-1, y:1.15, z:-1 } },
+      { a: { x:-1, y:-1, z:-1 }, b: { x:-1, y:-1, z:1 }, lbl: 'log₁₀α', lblAt: { x:-1, y:-1, z:1.15 } },
+    ];
+    for (const ax of axes) {
+      const pa = projectPoint(ax.a, W, H), pb = projectPoint(ax.b, W, H);
+      ctx.beginPath(); ctx.moveTo(pa.sx, pa.sy); ctx.lineTo(pb.sx, pb.sy); ctx.stroke();
+      const pl = projectPoint(ax.lblAt, W, H);
+      ctx.fillStyle = '#7a4b2b'; ctx.font = '13px Iowan Old Style, serif'; ctx.textAlign = 'center';
+      ctx.fillText(ax.lbl, pl.sx, pl.sy + 4);
+    }
+  }
+  pts.sort((a, b) => a.depth - b.depth);
+  const dotR = Math.min(W, H) / (N * 3.8) * cam.zoom;
+  for (const p of pts) {
+    const tv = Math.max(0, Math.min(1, p.v));
+    ctx.fillStyle = viridis(tv);
+    ctx.globalAlpha = 0.2 + 0.8 * tv;
+    ctx.beginPath(); ctx.arc(p.sx, p.sy, dotR, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Render everything
+// ─────────────────────────────────────────────────────────────────────
+const SOLVER_LABEL = { js: 'junction-shrinkage', pe: 'per-edge NNLS', pl: 'pooled NNLS' };
+function getLambda() { return Math.pow(10, parseFloat(document.getElementById('lambda-slider').value)); }
+function fmtLambda(lam) {
+  if (lam < 1e-3 || lam > 1e3) return 'λ = ' + lam.toExponential(1);
+  return 'λ = ' + (lam < 1 ? lam.toFixed(4) : lam.toFixed(2));
+}
+
+function renderAll() {
+  if (!cube) return;
+  const lam = getLambda();
+  document.getElementById('lambda-val').textContent = fmtLambda(lam);
+  const oracle = document.querySelector('input[name="mode"]:checked').value === 'oracle';
+  const solver = document.getElementById('solver-sel').value;
+  document.getElementById('lambda-row').style.opacity = (solver === 'js') ? '1' : '0.4';
+  document.getElementById('lambda-slider').disabled = (solver !== 'js');
+  document.getElementById('summary-title').textContent =
+    `E[R²] over (η, σ, α) — ${oracle ? 'oracle' : 'naive'} · ${SOLVER_LABEL[solver]}`;
+
+  const N = etas.length;
+  const ia = parseInt(document.getElementById('slider-alpha').value, 10);
+  const is = parseInt(document.getElementById('slider-sigma').value, 10);
+  const ie = parseInt(document.getElementById('slider-eta').value, 10);
+  document.getElementById('alpha-val').textContent = alphaLogs[ia].toFixed(2);
+  document.getElementById('sigma-val').textContent = sigmas[is].toFixed(2);
+  document.getElementById('eta-val').textContent = etas[ie].toFixed(2);
+
+  const heatES = [];
+  for (let j = 0; j < N; j++) { heatES.push([]); for (let i = 0; i < N; i++) heatES[j].push(cellR2(cube[i][j][ia], lam, oracle, solver)); }
+  drawHeatmap('heat-es', heatES, etas, sigmas, 'η', 'σ');
+
+  const heatEA = [];
+  for (let k = 0; k < N; k++) { heatEA.push([]); for (let i = 0; i < N; i++) heatEA[k].push(cellR2(cube[i][is][k], lam, oracle, solver)); }
+  drawHeatmap('heat-ea', heatEA, etas, alphaLogs, 'η', 'log₁₀α');
+
+  const heatSA = [];
+  for (let k = 0; k < N; k++) { heatSA.push([]); for (let j = 0; j < N; j++) heatSA[k].push(cellR2(cube[ie][j][k], lam, oracle, solver)); }
+  drawHeatmap('heat-sa', heatSA, sigmas, alphaLogs, 'σ', 'log₁₀α');
+
+  const vol = new Array(N); const flat = [];
+  for (let i = 0; i < N; i++) {
+    vol[i] = new Array(N);
+    for (let j = 0; j < N; j++) {
+      vol[i][j] = new Array(N);
+      for (let k = 0; k < N; k++) {
+        const v = cellR2(cube[i][j][k], lam, oracle, solver);
+        vol[i][j][k] = v;
+        if (isFinite(v)) flat.push(v);
+      }
+    }
+  }
+  _lastVol = vol;
+  if (flat.length) {
+    flat.sort((a, b) => a - b);
+    const mean = flat.reduce((s, v) => s + v, 0) / flat.length;
+    const median = flat[Math.floor(flat.length / 2)];
+    const fracHigh = flat.filter(v => v > 0.5).length / flat.length;
+    const fracVeryHigh = flat.filter(v => v > 0.9).length / flat.length;
+    const fmt = v => (v >= 0 ? ' ' : '') + v.toFixed(3);
+    const lamPart = solver === 'js' ? ` · λ = ${lam < 1e-3 || lam > 1e3 ? lam.toExponential(1) : lam.toPrecision(3)}` : '';
+    document.getElementById('summary-line').innerHTML =
+      `E[R²] = <b style="color:var(--accent2)">${fmt(mean)}</b> · median = ${fmt(median)} · `
+      + `min = ${fmt(flat[0])} · max = ${fmt(flat[flat.length-1])}<br>`
+      + `cells with R² > 0.5: ${(100*fracHigh).toFixed(1)}% · cells with R² > 0.9: ${(100*fracVeryHigh).toFixed(1)}% · `
+      + `cells = ${flat.length} · seeds/cell = ${cube[0][0][0].samples.length}${lamPart}`;
+  }
+  renderCube3D();
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Wire controls
+// ─────────────────────────────────────────────────────────────────────
+document.getElementById('run-btn').addEventListener('click', computeCube);
+document.getElementById('lambda-slider').addEventListener('input', renderAll);
+document.getElementById('slider-alpha').addEventListener('input', renderAll);
+document.getElementById('slider-sigma').addEventListener('input', renderAll);
+document.getElementById('slider-eta').addEventListener('input', renderAll);
+document.getElementById('cutoff-slider').addEventListener('input', renderCube3D);
+document.getElementById('show-axes').addEventListener('change', renderCube3D);
+document.querySelectorAll('input[name="mode"]').forEach(el => el.addEventListener('change', renderAll));
+document.getElementById('solver-sel').addEventListener('change', renderAll);
+
+(function () {
+  const c = document.getElementById('cube-canvas');
+  let dragging = false, lastX = 0, lastY = 0;
+  c.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    cam.yaw += (e.clientX - lastX) * 0.008;
+    cam.pitch += (e.clientY - lastY) * 0.008;
+    cam.pitch = Math.max(-1.3, Math.min(1.3, cam.pitch));
+    lastX = e.clientX; lastY = e.clientY;
+    renderCube3D();
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+  c.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cam.zoom *= e.deltaY < 0 ? 1.08 : 0.93;
+    cam.zoom = Math.max(0.4, Math.min(2.5, cam.zoom));
+    renderCube3D();
+  }, { passive: false });
+})();
+
+drawColourbar();
+window.addEventListener('load', () => setTimeout(computeCube, 150));
+</script>
+
+</main>
+</body>
+</html>

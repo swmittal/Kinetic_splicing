@@ -1,0 +1,18 @@
+# Heavy data directories — too big for GitHub
+data/
+logs/
+archive/
+
+# Grant document — not for the public repo
+21.03.08_R01_science_only.pdf
+
+# Python build artefacts
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Editor
+.idea/
+.vscode/
+*.swp

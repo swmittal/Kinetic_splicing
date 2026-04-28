@@ -1,0 +1,335 @@
+\documentclass[11pt, a4paper]{article}
+
+\usepackage{amsmath, amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, citecolor=blue!50!black, urlcolor=blue!50!black}
+
+% --- draft annotations ---------------------------------------------
+\newcommand{\note}[1]{\textcolor{red!70!black}{\textit{[#1]}}}
+\newcommand{\todo}[1]{\textcolor{blue!70!black}{\textit{[TODO: #1]}}}
+
+% --- shorthand ------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Rpos}{\mathbb{R}_{\geq 0}}
+\newcommand{\rstar}{r^{\star}}
+\newcommand{\Sstar}{S^{\star}}
+\newcommand{\Estar}{\mathcal{E}^{\star}}
+\newcommand{\Gstar}{G^{\star}}
+\newcommand{\Astar}{A_{\star}}
+\newcommand{\Bstar}{B_{\star}}
+\newcommand{\Dstar}{D_{\star}}
+
+\title{Identifiability of co-transcriptional splicing rates from steady-state isoform distributions}
+\author{Swapnil Mittal \and Justin Kinney}
+\date{Working draft --- \today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study when kinetic rates of a co-transcriptional splicing system can be recovered from a single steady-state observation of its isoform proportion distribution (IPD). The system is modelled as a continuous-time Markov chain on a directed acyclic graph (the DADA graph) whose nodes are partial-splicing intermediates and whose edges fire with unknown rates. We parametrise families of rate vectors by a low-dimensional splicing regime vector and ask, for each region of regime space, whether the inverse map from IPD to rates is well-posed. Recovery from a single IPD turns out to be possible only in trivial cases (one intron) or under restrictive structural assumptions (Kinetic regime, where all rates within a junction are equal). For richer regimes, two distinct levels of structural information restore identifiability: knowing the active subgraph, or observing the same gene under multiple export contexts.
+\end{abstract}
+
+\section{Introduction}
+
+\note{Motivate co-transcriptional kinetic competition and why \emph{rates} matter beyond outcome frequencies. Contrast with sequence-based alternative-splicing predictors. State the gap that motivates the inverse-problem framing.}
+
+The aim of this note is conceptual, not algorithmic. We do not propose a new estimator. We characterise the well-posedness of an inverse problem that several existing methods (NNLS-based and otherwise) tacitly assume to be solvable, and we work out what additional information --- structural priors, multiple observations of the same gene --- is needed to make the problem well-posed in cases where it is not.
+
+\section{The DADA graph}
+
+\subsection{Splice sites, junctions, and compatibility}
+
+A pre-mRNA carries an alternating sequence of donor (\textsf{D}) and acceptor (\textsf{A}) splice sites. We write the gene's site sequence as a string in the alphabet $\{\textsf{D}, \textsf{A}\}$ --- the \emph{DADA string}. A \emph{junction} is an ordered pair $j = (d, a)$ of a donor at site $d$ and a later acceptor at site $a > d$; junction $j$ corresponds to the molecular event of splicing out the intron between sites $d$ and $a$.
+
+Two junctions $j = (d, a)$ and $j' = (d', a')$ are \emph{compatible} if (a) they share no splice site --- $d \neq d'$ and $a \neq a'$ --- and (b) their open intervals $(d, a)$ and $(d', a')$ are either disjoint or properly nested.
+
+\subsection{States, edges, and isoforms}
+
+Define the state set $\mathcal{V}$ as the collection of \emph{antichains} of compatible junctions: each $S \in \mathcal{V}$ is a set of mutually compatible junctions. The biological reading is that $S$ records exactly the splices that have already been made; the molecule in state $S$ is the partial isoform with those introns removed. The state $\emptyset$ is the unspliced pre-mRNA; the maximal antichains are mature isoforms.
+
+The DADA graph is
+\[
+G \;=\; (\mathcal{V}, \mathcal{E}), \qquad \mathcal{E} \;=\; \big\{\, (S, S \cup \{j\}) \,:\, S \in \mathcal{V},\ j \notin S,\ j \text{ compatible with all of } S \,\big\}.
+\]
+Each edge fires a single junction. Edges are written $e = S \to S \cup \{j\}$, and we say edge $e$ is \emph{labelled by} junction $j(e) = j$; multiple edges may share a junction label, since the same splicing reaction can fire from different intermediate isoforms. The rate of edge $e$ is $r_e \geq 0$. The graph is rooted at $\emptyset$ and is, by construction, a directed acyclic graph (DAG): each edge strictly enlarges the set of completed splices.
+
+\subsection{Worked example: \texttt{DADA} (\texorpdfstring{$K = 2$ introns}{K=2 introns})}
+\label{sec:dada-example}
+
+For the DADA string \texttt{DADA} (sites $\textsf{D}_0\,\textsf{A}_1\,\textsf{D}_2\,\textsf{A}_3$) the junctions are
+\[
+j_1 = (0, 1), \qquad j_2 = (0, 3), \qquad j_3 = (2, 3).
+\]
+Compatibility:
+\begin{itemize}[noitemsep, topsep=2pt]
+  \item $j_1$ and $j_2$ share donor $\textsf{D}_0$: incompatible.
+  \item $j_2$ and $j_3$ share acceptor $\textsf{A}_3$: incompatible.
+  \item $j_1 = (0,1)$ and $j_3 = (2,3)$: disjoint intervals: compatible.
+\end{itemize}
+The state set $\mathcal{V} = \{\,\emptyset,\ \{j_1\},\ \{j_2\},\ \{j_3\},\ \{j_1, j_3\}\,\}$ has $N = 5$ elements; the graph has $M = 5$ edges:
+\begin{align*}
+e_1: \emptyset \to \{j_1\},\ j(e_1) = j_1, \quad &
+e_2: \emptyset \to \{j_2\},\ j(e_2) = j_2, \\
+e_3: \emptyset \to \{j_3\},\ j(e_3) = j_3, \quad &
+e_4: \{j_1\} \to \{j_1, j_3\},\ j(e_4) = j_3, \\
+e_5: \{j_3\} \to \{j_1, j_3\},\ j(e_5) = j_1. &
+\end{align*}
+Note that junctions $j_1$ and $j_3$ each label two edges (different intermediate states from which the same splicing reaction can fire), while $j_2$ labels only one edge because it is incompatible with everything else.
+
+\todo{Insert figure: DADA state graph with nodes $\emptyset, \{j_1\}, \{j_2\}, \{j_3\}, \{j_1,j_3\}$, edges labelled by $j(e)$.}
+
+\section{The forward model}
+\label{sec:forward}
+
+Each non-root state $i$ is exported (transcribed off the chromatin and observed as mature mRNA) at a known rate $\lambda_i \geq 0$. Pre-mRNA enters the system at the root $i = 0$ at unit production rate. The probability $p_i$ of finding a single molecule in state $i$ at steady state satisfies, for each $i \in \mathcal{V}$,
+\begin{equation}
+\underbrace{\sum_{e:\ \mathrm{dst}(e) = i} r_e\, p_{\mathrm{src}(e)}}_{\text{flux in}}
+\;-\;
+\underbrace{\sum_{e:\ \mathrm{src}(e) = i} r_e\, p_i}_{\text{flux out}}
+\;-\;
+\lambda_i\, p_i
+\;=\;
+-\delta_{i, 0}.
+\label{eq:balance-row}
+\end{equation}
+The root row is dependent on the others (mass conservation: total inflow = total export), so we drop it and stack the remaining $N - 1$ equations into matrix form,
+\begin{equation}
+A(p)\, r \;=\; c(p), \qquad A \in \R^{(N - 1) \times M}, \qquad c \in \R^{N - 1},
+\label{eq:balance}
+\end{equation}
+with
+\[
+A_{i, e} \;=\; \begin{cases} +\,p_{\mathrm{src}(e)} & \text{if } \mathrm{dst}(e) = i, \\ -\,p_{\mathrm{src}(e)} & \text{if } \mathrm{src}(e) = i, \\ 0 & \text{otherwise}, \end{cases}
+\qquad
+c_i \;=\; \lambda_i\, p_i.
+\]
+Equation~\eqref{eq:balance} is the central object. We observe $p$ (the IPD), $\lambda$ is known, so $A$ and $c$ are computable; the rates $r$ are the unknowns.
+
+\section{The inverse problem}
+\label{sec:inverse}
+
+Given the IPD $p$ and the export rates $\lambda$, we want to recover the rate vector $r$. A natural formulation is
+\begin{equation}
+\widehat{r} \;=\; \arg\min_{r \geq 0} \; \big\| A(p)\, r - c(p) \big\|_2^2.
+\label{eq:nnls}
+\end{equation}
+The non-negativity constraint is biologically essential: rates are physical reaction frequencies. We refer to the optimisation problem~\eqref{eq:nnls} as the \emph{inverse problem}; the question of this paper is whether $\widehat{r}$ equals the truth $\rstar$, and under what conditions.
+
+\section{The splicing regime vector}
+\label{sec:srv}
+
+\subsection{Generative model for rates}
+
+We model the truth $\rstar$ as a draw from a parametric family controlled by a low-dimensional regime vector
+\[
+\theta \;=\; (\eta,\ \sigma,\ \alpha) \;\in\; [0, 1] \times \R_{\geq 0} \times \R_{> 0}.
+\]
+The Mixed-Dirichlet generator at $\theta$ samples a rate vector by:
+\begin{enumerate}[leftmargin=*, itemsep=2pt, topsep=2pt]
+  \item For each junction $j$, draw an amplitude $\rho_j \sim \mathrm{LogNormal}(\log R_0,\ \sigma^2)$.
+  \item For each non-root state $i$ with $m_i$ incoming edges, set the active cardinality
+    \[
+    k_i \;=\; \max\bigl(1,\ \mathrm{round}(\eta\,m_i)\bigr),
+    \]
+    pick a uniform random size-$k_i$ subset $S_i$ of the $m_i$ incoming edges, and draw weights $w \sim \mathrm{Dirichlet}(\alpha, \dots, \alpha)$ over $S_i$.
+  \item Set $r_e = \rho_{j(e)} \cdot k_i \cdot w_e$ if $e \in S_i$ (where $i = \mathrm{dst}(e)$), else $r_e = 0$.
+\end{enumerate}
+The active mask is $\Sstar = \{e : r_e > 0\}$ and the active subgraph $\Gstar$ is the subgraph induced on edges in $\Sstar$.
+
+\subsection{Four canonical regimes}
+
+The corners and faces of regime space have biologically natural interpretations:
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=2pt]
+  \item \textbf{Null}: $\sigma = 0$, $\alpha \to \infty$. Degenerate: all rates equal $R_0$. Useful as a baseline.
+  \item \textbf{Predetermined}: $\eta = 0$. Each child has exactly one active parent, so $\Gstar$ is a tree (a spanning tree of the active state subgraph).
+  \item \textbf{Kinetic}: $\eta = 1$, $\alpha \to \infty$. Every edge is active and the Dirichlet weights are uniform within each junction, so $r_e = \rho_{j(e)}$ for every active edge of junction $j$.
+  \item \textbf{Mixed}: $\eta \in (0, 1)$, $\alpha$ moderate. Partial branching with uneven weights. The biologically realistic regime, and the hard one for inverse inference.
+\end{itemize}
+The four are not exhaustive; they are landmarks. The whole prior cube $\theta \in [0,1] \times [0, \infty) \times (0, \infty)$ is a continuous interpolation between them.
+
+\section{What is identifiable, and when}
+\label{sec:identifiability}
+
+We work throughout this section with a single noiseless IPD $p$ and known export rates $\lambda$.
+
+\subsection{The relevant linear-algebraic objects}
+
+Given an active edge set $\Estar$ define the active subgraph $\Gstar = (\mathcal{V}^{\star}, \Estar)$ where $\mathcal{V}^{\star}$ is the set of states touched by edges in $\Estar$ together with the root; let $N^{\star} = |\mathcal{V}^{\star}|$ and $M^{\star} = |\Estar|$. We assume throughout that $\Gstar$ is connected (always true for our DADA graphs because of the rooted construction).
+
+The masked balance matrix $\Astar$ is the column restriction of $A$ in~\eqref{eq:balance} to columns indexed by $\Estar$. It admits the factorisation
+\[
+\Astar \;=\; \Bstar \cdot \Dstar,
+\]
+where $\Bstar$ is the (root-removed) signed incidence matrix of $\Gstar$ --- with $(\Bstar)_{i, e} = +1$ if $\mathrm{dst}(e) = i$, $-1$ if $\mathrm{src}(e) = i$, and $0$ otherwise --- and $\Dstar$ is the diagonal matrix with $(\Dstar)_{e,e} = p_{\mathrm{src}(e)}$. When all $p_{\mathrm{src}(e)} > 0$, $\Dstar$ is invertible and
+\[
+\mathrm{rank}(\Astar) \;=\; \mathrm{rank}(\Bstar) \;=\; N^{\star} - 1.
+\]
+This last equality is the standard fact that the (reduced) signed incidence matrix of a connected graph on $N^{\star}$ vertices has rank $N^{\star} - 1$.
+
+The kernel of $\Astar$ is therefore
+\[
+\ker(\Astar) \;=\; \Dstar^{-1} \ker(\Bstar) \;\cong\; \ker(\Bstar),
+\]
+which is the cycle space of $\Gstar$ (treated as an undirected graph for cycle-space purposes), of dimension equal to the cyclomatic number
+\begin{equation}
+c(\Gstar) \;=\; M^{\star} - N^{\star} + 1.
+\label{eq:cyclomatic}
+\end{equation}
+
+A non-trivial element of $\ker(\Bstar)$ corresponds to a cycle in the underlying undirected graph of $\Gstar$ --- equivalently, two distinct directed paths between the same pair of states. Although $\Gstar$ has no directed cycles (it is a DAG), the existence of multiple parallel directed paths between the same pair of vertices means rate flux can be \emph{redistributed} between alternatives without changing the IPD.
+
+\subsection{Single IPD with known active subgraph}
+\label{sec:single-ipd-mask}
+
+If we are given the exact active set $\Estar$, the inverse problem reduces to solving \eqref{eq:nnls} restricted to columns of $\Estar$. The picture splits cleanly on $c(\Gstar)$:
+
+\paragraph{Tree case ($c(\Gstar) = 0$).} Then $M^{\star} = N^{\star} - 1 = \mathrm{rank}(\Astar)$, so $\Astar$ has full column rank, the system $\Astar r = c$ has at most one solution, the truth $\rstar$ is one such, and NNLS returns $\rstar$ exactly.
+
+\paragraph{Cyclic case ($c(\Gstar) > 0$).} Then $\ker(\Astar)$ has positive dimension. For a generic truth $\rstar$ in the strictly positive orthant, $\rstar$ is in the relative interior of the polytope
+\[
+\big\{\, r \geq 0 \,:\, \Astar r = c \,\big\},
+\]
+which has dimension $c(\Gstar) > 0$. Multiple non-negative rate vectors then produce the same IPD, and NNLS alone (without further structure) cannot distinguish them. The corner of the polytope picked by Lawson--Hanson NNLS depends on algorithmic details rather than on the data.
+
+\paragraph{Numerical aside.} Even in the tree case, plain NNLS can be numerically poor on graphs of large depth because $\Astar = \Bstar \Dstar$ inherits a large condition number when source-state probabilities span many orders of magnitude. We have observed that on the tree subgraph of \texttt{DADADADADADA} ($K = 6$ introns), per-edge NNLS frequently fails despite full column rank. The augmented system used by junction-shrinkage NNLS (Section~\ref{sec:junction-shrinkage}) regularises the conditioning sufficiently to recover the truth at machine precision.
+
+\subsection{Single IPD without the mask}
+\label{sec:no-mask}
+
+In the realistic case where we observe only $p$ and the topology $G$ (not which edges are active), the situation is strictly worse. The full balance matrix $A$ has $M$ columns and $N - 1$ rows with $M > N - 1$ for every non-trivial DADA graph; therefore
+\[
+\dim \ker(A) \;\geq\; M - (N - 1) \;>\; 0,
+\]
+and the NNLS solution set has positive dimension regardless of $c(\Gstar)$. The truth $\rstar$ is one of many non-negative rate vectors fitting the same $p$.
+
+A separate issue is that distinct active subgraphs can produce identical IPDs. The \emph{cardinality shell} of a realisation is the set of active masks consistent with the cardinality profile $(k_i)_{i \in \mathcal{V}^{\star}}$. We have observed empirically (\note{on \texttt{DADADA}, $K = 3$, with $\eta = 0.5$, all 96 elements of the shell admit non-negative rate vectors fitting the same IPD to floating-point precision}). Cardinality is identifiable from the IPD; mask identity, generically, is not.
+
+\subsection{Junction-shrinkage and the Kinetic regime}
+\label{sec:junction-shrinkage}
+
+Suppose we additionally constrain the rates to lie on the \emph{junction-equal subspace}
+\[
+W_{\mathrm{eq}} \;=\; \big\{\, r \in \R^{M^{\star}} \,:\, r_{e} = r_{e'} \text{ whenever } j(e) = j(e') \,\big\}.
+\]
+Inside $W_{\mathrm{eq}}$, the unknowns collapse from $M^{\star}$ edge rates to $J^{\star}$ junction rates, where $J^{\star}$ is the number of junctions touched by edges in $\Estar$. The pooled balance matrix $A_{\mathrm{pool}}$ then has shape $(N - 1) \times J^{\star}$, and for typical DADA topologies $J^{\star} \ll N - 1$, so $A_{\mathrm{pool}}$ is generically full column rank.
+
+Two consequences:
+
+\begin{enumerate}[leftmargin=*, itemsep=2pt, topsep=2pt]
+  \item Pooled NNLS (which solves~\eqref{eq:nnls} on $A_{\mathrm{pool}}$ rather than $A$) recovers the junction rates uniquely from a single IPD. \emph{No active mask is required}: an inactive edge contributes zero to the column-aggregation in its junction. This is the Kinetic regime ($\eta = 1$, $\alpha \to \infty$), because the truth $\rstar$ then satisfies $\rstar \in W_{\mathrm{eq}}$ exactly --- all active edges of a junction share the rate $\rho_j$.
+
+  \item The junction-shrinkage NNLS solver augments the balance equations with Helmert contrasts, equivalent to a soft penalty for deviation from $W_{\mathrm{eq}}$. The augmented matrix is overdetermined regardless of $c(\Gstar)$. When $\rstar \in W_{\mathrm{eq}}$, the augmented system is consistent and recovers $\rstar$ exactly (this includes both the Predetermined regime, where every junction has at most one active edge so the constraints are vacuous, and the Kinetic regime). When $\rstar \notin W_{\mathrm{eq}}$, the augmented system is inconsistent and the LS solution is biased toward $W_{\mathrm{eq}}$, giving $\widehat{r} \neq \rstar$.
+\end{enumerate}
+
+The boundary between "junction-shrinkage works" and "junction-shrinkage fails" is therefore not the cyclomatic boundary $c(\Gstar) = 0$, but the inclusion $\rstar \in W_{\mathrm{eq}}$. Under the Mixed-Dirichlet generator, $\Pr(\rstar \in W_{\mathrm{eq}}) \to 1$ as $\alpha \to \infty$ (the Kinetic limit) and $\Pr(\rstar \in W_{\mathrm{eq}}) = 1$ when $\eta = 0$ (Predetermined, vacuous constraints). For Mixed regimes at finite $\alpha$, the probability is generically zero.
+
+\subsection{Worked example: \texorpdfstring{$K = 2$ (\texttt{DADA})}{K=2 (DADA)}}
+
+For \texttt{DADA} (Section~\ref{sec:dada-example}) the full graph has $M = 5$, $N = 5$, and
+\[
+c(G) \;=\; M - N + 1 \;=\; 1.
+\]
+The single cycle is the diamond at state $\{j_1, j_3\}$, reachable through $\{j_1\} \xrightarrow{e_4} \{j_1, j_3\}$ or through $\{j_3\} \xrightarrow{e_5} \{j_1, j_3\}$. Concrete consequences:
+
+\begin{itemize}[leftmargin=*, itemsep=2pt, topsep=2pt]
+  \item \textbf{Predetermined, or Mixed at $\eta < 0.75$.} The branching state $\{j_1, j_3\}$ has $m = 2$ parents, and the active cardinality $k = \max(1, \mathrm{round}(2\eta))$ equals $1$ for $\eta < 0.75$. Only one of $\{e_4, e_5\}$ is active. The active subgraph is a $4$-edge tree ($c(\Gstar) = 0$). Identifiable \emph{given the mask}, but not from the IPD alone --- the cardinality shell of size $2$ (active edge $e_4$ \emph{or} $e_5$) is the source of ambiguity.
+
+  \item \textbf{Kinetic ($\eta = 1$, $\alpha \to \infty$).} All $5$ edges active, $\rstar \in W_{\mathrm{eq}}$, pooled NNLS solves a $4 \times 3$ system with unique solution. Identifiable from the IPD alone, no mask required.
+\end{itemize}
+
+The trivial graph \texttt{DA} ($K = 1$, $N = 2$, $M = 1$, $c = 0$) is identifiable under any prior because the single rate is read off from the single non-root balance equation directly.
+
+\section{Paths to enlarge identifiability}
+\label{sec:paths}
+
+Three structural augmentations restore identifiability outside the cases of Section~\ref{sec:identifiability}. We describe each briefly; each suggests a different experimental or computational direction.
+
+\subsection{Multiple export contexts}
+
+\note{Notation: we use $K$ for the number of introns elsewhere; here we use $T$ (number of tissues / contexts) to avoid the clash.}
+
+Suppose we observe the same gene's IPD under $T$ distinct export profiles $\lambda^{(1)}, \dots, \lambda^{(T)}$ --- e.g.\ the same gene measured in different cell types or conditions, in which the underlying junction rates $r$ are conserved but per-state decay rates differ. Stacking the $T$ balance systems yields
+\[
+\underbrace{\begin{bmatrix} A^{(1)}(p^{(1)}) \\ \vdots \\ A^{(T)}(p^{(T)}) \end{bmatrix}}_{\text{$T(N-1) \times M^{\star}$}} r \;=\; \begin{bmatrix} c^{(1)} \\ \vdots \\ c^{(T)} \end{bmatrix}.
+\]
+Each block alone has rank $N^{\star} - 1$, but the column scalings $\Dstar^{(t)}$ differ across blocks because the $p^{(t)}$ differ; the kernels $\ker(A^{(t)}_{\star})$ are accordingly different "rotations" of the same underlying cycle space $\ker(\Bstar)$. Generically, $T \geq \lceil M^{\star} / (N^{\star} - 1) \rceil$ contexts suffice to make the stacked matrix full column rank, recovering $\rstar$ exactly without knowing the active mask. For most practical DADA topologies this number is small (2 or 3).
+
+\note{We should validate this dimension bound on real data --- to what extent is GTEx- or ENCODE-level cell-type variation \emph{generic} in the sense required?}
+
+\subsection{Sequence-based priors on active junctions}
+
+Pre-trained sequence models (SpliceAI, AlphaGenome) predict per-junction probabilities of splice-site usage from sequence alone. Thresholding these declares some junctions inactive, eliminating their edges from $\mathcal{E}$ and shrinking $M^{\star}$. A prior strong enough to bring $M^{\star}$ down to $N^{\star} - 1$ recovers the tree case directly. Even partial reductions help: each removed edge can decrease $c(\Gstar)$ by $0$ or $1$, and the cardinality shell shrinks correspondingly.
+
+\subsection{Direct path observation (long-read)}
+
+Long-read sequencing observes individual transcript paths through the DADA graph rather than aggregate isoform proportions. Empirical edge frequencies from many reads give a direct estimate of the active mask $\Sstar$. Combined with NNLS on the masked balance system, this is the cleanest route in current data modalities and arguably the most under-used.
+
+\section{Summary}
+
+The state of identifiability is summarised in Table~\ref{tab:summary}.
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{2}{c}{\textbf{Single IPD}} & \multicolumn{2}{c}{\textbf{Multi-context IPDs}} \\
+\cline{2-3} \cline{4-5}
+\textbf{Splice regime} & without mask & with mask & without mask & with mask \\
+\midrule
+Trivial ($K = 1$, \texttt{DA}) & yes & yes & yes & yes \\
+Predetermined / Mixed ($K \geq 2$) & no & yes (tree) & yes \note{check} & yes \\
+Kinetic & yes (junction-equal) & yes & yes & yes \\
+\bottomrule
+\end{tabular}
+\caption{Identifiability of the rate vector $\rstar$ as a function of the splice regime and the structural information available. "Tree" means the active subgraph $\Gstar$ has cyclomatic number zero; "junction-equal" means the truth lies in $W_{\mathrm{eq}}$. The mark "\note{check}" indicates an empirical claim we have not yet rigorously verified.}
+\label{tab:summary}
+\end{table}
+
+The single most important takeaway: \emph{from a single IPD with no structural prior, the only splice regime that admits identifiable rates is Kinetic}, because that is the only regime where the truth's structure (junction-equal) collapses the $M^{\star}$-dimensional inverse problem to the lower-dimensional pooled problem on $J^{\star}$ junction rates. Every other regime requires either the active mask, or multiple observations from different export contexts, or a sequence-based prior that shrinks the candidate active edge set.
+
+\section{Open questions}
+
+\begin{itemize}[leftmargin=*, itemsep=4pt, topsep=2pt]
+  \item How non-generic are real cell-type-paired export profiles? Does GTEx- or ENCODE-level across-tissue variation suffice to satisfy the multi-context recovery condition for typical genes?
+  \item How sharp is the "junction-equal" boundary for biological data? In real splicing, within-junction weight ratios are presumably non-uniform; how close to equal is "equal enough" for junction-shrinkage NNLS to recover useful (if biased) rates?
+  \item What is the right way to combine sequence-based junction priors with the multi-context approach to handle the largest practical DADA graphs ($K \geq 8$ introns), where exhaustive enumeration of cardinality shells or active subgraphs is infeasible?
+  \item Are there genes whose splicing structure reliably falls in the Kinetic regime in some tissues? For those, single-IPD inversion via pooled NNLS is exact, with no auxiliary information needed --- a directly testable prediction.
+\end{itemize}
+
+% --------------------------------------------------------------
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+
+\bibitem{slawski-hein-2013}
+Martin Slawski and Matthias Hein.
+\newblock Non-negative least squares for high-dimensional linear models: Consistency and sparse recovery without regularisation.
+\newblock \emph{Electronic Journal of Statistics}, 7:3004--3056, 2013.
+
+\bibitem{churchman-2020}
+\note{nano-COP / Churchman lab paper --- fill in correct reference.}
+
+\bibitem{drexler-2020}
+\note{Drexler et al.\ 2020 on K562 chromatin nano-COP --- fill in.}
+
+\bibitem{alphagenome}
+\note{Avsec et al., AlphaGenome --- fill in.}
+
+\bibitem{biggs-1993}
+Norman Biggs.
+\newblock \emph{Algebraic Graph Theory}.
+\newblock Cambridge University Press, 2nd edition, 1993.
+\newblock (Standard reference for cycle space, signed incidence matrix rank, and the cyclomatic number.)
+
+\end{thebibliography}
+
+\end{document}
